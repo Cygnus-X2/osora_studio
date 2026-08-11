@@ -25,7 +25,9 @@
       "Bash(git remote *)",
       "Bash(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com)",
       "Bash(git add *)",
-      "Bash(grep -iE \"\\\\.env\\($|\\\\.local|\\\\.production$\\)\")"
+      "Bash(grep -iE \"\\\\.env\\($|\\\\.local|\\\\.production$\\)\")",
+      "Bash(git -c user.name=\"Nik Völker\" -c user.email=\"niklas.voelker@eigenblue.ai\" commit -q -F -)",
+      "Bash(git push *)"
     ]
   }
 }

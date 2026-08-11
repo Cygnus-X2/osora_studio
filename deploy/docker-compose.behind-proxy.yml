@@ -33,6 +33,23 @@ services:
       retries: 10
       start_period: 20s
 
+  # One-shot. The runtime image is Next's standalone output and deliberately
+  # carries no source or dev tooling, so schema work runs from the build stage:
+  #   docker compose -f deploy/docker-compose.behind-proxy.yml run --rm migrate
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: build
+    profiles: ["tools"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-osora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-osora}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    command: sh -c "npm run db:migrate && npm run db:seed && npm run db:status"
+
   app:
     build:
       context: ..
