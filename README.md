@@ -298,51 +298,87 @@ npx supabase gen types typescript --linked > src/lib/supabase/types.ts
 
 ## Deployment
 
-**Read this before deploying to Vercel.** The mandatory-measurement invariant
-does not survive a naive serverless deploy.
+Osora Studio is **self-hosted on a single box**: the app, Postgres, and the
+audio toolchain in one place. That is a deliberate choice, not a fallback —
+mandatory measurement needs ffprobe at runtime and assembly needs ffmpeg with
+enough time and disk to mix a fifteen-minute session.
 
-`ffprobe` and `ffmpeg` are not present in Vercel's serverless runtime. Every
-generated or uploaded asset would fail measurement, which — correctly — means
-nothing could ever be marked ready. The failure is loud rather than silent,
-but it is still a failure.
+### Why not serverless
 
-Three workable shapes, in increasing order of effort:
+`ffprobe` and `ffmpeg` do not exist in Vercel's serverless runtime. Every asset
+would fail measurement, which — correctly — means nothing could ever be marked
+ready. You can bundle `ffprobe-static` to recover measurement, but assembly
+still exceeds the function time limit and `/tmp` is per-invocation, so a
+multi-step pipeline cannot share files between calls. A container solves all of
+it at once.
 
-**1. Vercel + bundled static binaries (measurement only).**
-Add `ffprobe-static` and include it in the function bundle:
+### On a fresh server
 
-```ts
-// next.config.ts
-outputFileTracingIncludes: {
-  "/api/audio/**": ["./node_modules/ffprobe-static/bin/**"],
-}
+```bash
+# On the server, as root:
+bash deploy/provision.sh          # Docker, deploy user, ufw, SSH hardening
+
+# Then, from the repository root:
+cp .env.production.example .env.production   # fill it in
+./deploy/deploy.sh
 ```
 
-Then point `FFPROBE_PATH` at the unpacked binary. This gets you *measurement*,
-which is the invariant that matters. It does not get you assembly: a 12-minute
-mix with `loudnorm` will exceed the function time limit, and `/tmp` is ephemeral
-and per-invocation, so a multi-step pipeline cannot share files between calls.
+`provision.sh` resets the firewall and disables SSH password authentication.
+**Read it before running it on a box that already does something** — it will
+happily close ports another service depends on.
 
-**2. Vercel for the app, a container for audio (recommended).**
-Deploy the Next.js app to Vercel and move `/api/audio/*` to a small container
-service on Fly.io, Railway or Render where ffmpeg is a one-line Dockerfile
-install. Audio lands in Supabase Storage and is served through signed URLs, so
-neither side needs a persistent disk. This is the shape the code already
-assumes — `src/providers/audio/*` is isolated behind two modules precisely so it
-can move.
+### On a server that already runs something
 
-**3. Everything in one container.** Simplest to reason about, and fine until
-the studio needs to scale differently from the audio work.
+Use the behind-proxy compose file, which binds the app to loopback and ships no
+Caddy of its own — two processes competing for `:443` is a broken deploy, and
+taking the port from the incumbent is worse.
 
-### Vercel plan notes
+```bash
+docker compose --env-file .env.production \
+  -f deploy/docker-compose.behind-proxy.yml up -d --build
+```
 
-- **Hobby (free) does not cap the number of projects** — you can run many. The
-  binding constraint is that Hobby is licensed for non-commercial use only.
-  Osora Studio is an internal company platform, so it needs **Pro**.
-- Hobby also has a short function timeout, which the assembly step would exceed
-  regardless of the binary question.
-- Vercel's limits change; check the current pricing page rather than trusting
-  this paragraph.
+Then give the existing reverse proxy a site block pointing at
+`127.0.0.1:${OSORA_PORT:-3100}`.
+
+Note the `--env-file` flag: Compose reads *interpolation* variables from `.env`
+in the project directory, which is not the same thing as a service's
+`env_file`. Without it, `${POSTGRES_PASSWORD}` is empty and the stack refuses
+to start.
+
+### Schema and knowledge base
+
+The runtime image is Next's standalone output and deliberately carries no
+source or dev tooling, so schema work runs from the build stage:
+
+```bash
+docker compose --env-file .env.production \
+  -f deploy/docker-compose.behind-proxy.yml run --rm migrate
+```
+
+That applies migrations in filename order (each in its own transaction,
+recorded in `schema_migrations`) and seeds the knowledge base — state
+dimensions, mechanisms, interventions, sources, professionals, DNA — from the
+TypeScript libraries, so there is one source of truth rather than a SQL copy
+that drifts.
+
+The migrations run unchanged on both self-hosted Postgres and Supabase: an
+`auth` shim creates `auth.uid()` and `auth.role()` **only when absent**, so it
+is a no-op on Supabase rather than silently replacing real authentication.
+
+### Put something in front of it
+
+**The studio ships with mock authentication.** Anyone who reaches it can browse
+everything and spend your TTS credits through the generation endpoint. Basic
+auth at the proxy is the minimum; real authentication is a prerequisite for
+exposing it to anyone outside the team.
+
+### Pages that must not be prerendered
+
+Anything reporting live infrastructure — `/settings`, `/audio-lab` — sets
+`export const dynamic = "force-dynamic"`. Without it, Next bakes build-time
+state into the page and a container with ffmpeg installed cheerfully reports
+that ffprobe is missing.
 
 ### Environment gotcha
 
