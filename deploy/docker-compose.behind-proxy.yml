@@ -1,0 +1,67 @@
+# Osora Studio, fully self-hosted, on a host that already has a reverse proxy.
+#
+# Use this instead of the root docker-compose.yml when something else already
+# owns ports 80/443 — as on a box already running Caddy for another service.
+# The app binds to loopback only, so it is not reachable from the internet
+# until the existing proxy is given a site block for it.
+#
+#   docker compose -f deploy/docker-compose.behind-proxy.yml up -d --build
+#
+# Deliberately no Caddy service here: two processes competing for :443 is a
+# broken deploy, and taking the port from the incumbent is worse.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: osora-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-osora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-osora}
+      # Deterministic collation, so ordering does not drift with the host locale.
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=en-GB --encoding=UTF8"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not published. Only the app container can reach it.
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-osora} -d ${POSTGRES_DB:-osora}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: osora-studio
+    restart: unless-stopped
+    env_file: ../.env.production
+    environment:
+      AUDIO_STORAGE_DIR: /data/audio
+      DATABASE_URL: postgres://${POSTGRES_USER:-osora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-osora}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - audio:/data/audio
+    ports:
+      # Loopback only. Exposure is the proxy's decision, not this file's.
+      - "127.0.0.1:${OSORA_PORT:-3100}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  audio:
+  pgdata:

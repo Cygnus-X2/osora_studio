@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm i *)",
+      "Bash(npx tsc *)",
+      "Bash(npx --yes tsx@4 --tsconfig tsconfig.json /private/tmp/claude-501/-Users-nik-projects-osora-studio/9adf6c4d-743f-4886-97e6-548a19e1b869/scratchpad/smoke.ts)",
+      "Bash(npx --yes tsx@4 smoke.mts)",
+      "Bash(npm run *)",
+      "Bash(curl -s -X POST http://localhost:3000/api/audio/generate -H 'content-type: application/json' -d '{ *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -i -X POST http://localhost:3000/api/audio/generate -H 'content-type: application/json' -d '{\"capability\":\"ambient\",\"provider\":\"mock\",\"modelId\":\"mock_sound_v1\",\"prompt\":\"low bed\",\"requestedDurationSeconds\":10,\"intensity\":0.3,\"seed\":7}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/audio/generate -H 'content-type: application/json' -d '{\"capability\":\"ambient\",\"provider\":\"mock\",\"modelId\":\"mock_sound_v1\",\"prompt\":\"low bed\",\"requestedDurationSeconds\":10,\"intensity\":0.3,\"seed\":7}')",
+      "Bash(ffmpeg -hide_banner -loglevel error -y -f lavfi -i \"sine=frequency=200:duration=12.35\" -ac 1 -ar 44100 /tmp/osora-dbg/probe-test.wav)",
+      "Bash(curl -s -X POST http://localhost:3000/api/audio/upload -F \"file=@/tmp/osora-dbg/probe-test.wav\" -F \"requestedDurationSeconds=15\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/audio/generate -H 'content-type: application/json' -d '{\"capability\":\"speech\",\"provider\":\"mock\",\"modelId\":\"mock_speech_v2\",\"voiceId\":\"mock-voice-aurel\",\"text\":\"Let your attention move to where your feet meet the floor.\",\"speakingRate\":1,\"seed\":null}')",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s \"http://localhost:3000/api/voices?provider=mock\")",
+      "Bash(curl -s \"http://localhost:3000/api/voices?provider=elevenlabs\")",
+      "Bash(curl -s -o /dev/null -X POST http://localhost:3000/api/audio/generate -H 'content-type: application/json' -d '{\"capability\":\"ambient\",\"provider\":\"mock\",\"modelId\":\"mock_sound_v1\",\"prompt\":\"bed\",\"requestedDurationSeconds\":5,\"intensity\":0.3,\"seed\":1}')",
+      "Read(//private/var/folders/gd/**)",
+      "Bash(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 root@168.119.168.191 ' *)",
+      "Bash(ssh -o BatchMode=yes root@168.119.168.191 ' *)",
+      "Bash(python3 -)",
+      "Bash(git check-ignore *)",
+      "Bash(git remote *)",
+      "Bash(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -T git@github.com)",
+      "Bash(git add *)",
+      "Bash(grep -iE \"\\\\.env\\($|\\\\.local|\\\\.production$\\)\")"
+    ]
+  }
+}

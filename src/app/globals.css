@@ -1,26 +1,150 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ------------------------------------------------------------------
+   Osora Studio design tokens
+   Warm off-white canvas, stone / sand / clay accents, charcoal type.
+   ------------------------------------------------------------------ */
+
+@theme {
+  /* Canvas + surfaces */
+  --color-canvas: #faf8f4;
+  --color-canvas-sunk: #f3efe8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7f4ee;
+  --color-surface-raised: #fffdfa;
+
+  /* Type */
+  --color-ink: #2b2825;
+  --color-ink-soft: #55504a;
+  --color-ink-muted: #857d72;
+  --color-ink-faint: #a89f93;
+
+  /* Lines */
+  --color-line: #e8e2d8;
+  --color-line-strong: #d8d0c3;
+
+  /* Earth accents */
+  --color-clay: #b0745a;
+  --color-clay-soft: #f1e3db;
+  --color-sand: #c9ab7f;
+  --color-sand-soft: #f4ecdd;
+  --color-stone: #8b8477;
+  --color-stone-soft: #eeebe4;
+  --color-sage: #6f8471;
+  --color-sage-soft: #e6ede5;
+  --color-amber: #a97c37;
+  --color-amber-soft: #f6ecd8;
+  --color-rust: #9d5648;
+  --color-rust-soft: #f4e2de;
+  --color-slate: #5f6b74;
+  --color-slate-soft: #e7ecef;
+
+  /* Radii — rounded but restrained */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* Soft shadows */
+  --shadow-quiet: 0 1px 2px rgb(43 40 37 / 0.04), 0 1px 1px rgb(43 40 37 / 0.03);
+  --shadow-lift: 0 2px 6px rgb(43 40 37 / 0.05), 0 8px 24px -12px rgb(43 40 37 / 0.12);
+  --shadow-float: 0 4px 12px rgb(43 40 37 / 0.06), 0 20px 48px -20px rgb(43 40 37 / 0.18);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --animate-rise: rise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade: fade 0.24s ease-out;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background-color: var(--color-sand-soft);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-clay);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+  }
+}
+
+@layer components {
+  /* Quiet scrollbars — the studio should not be noisy */
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  .scroll-quiet::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb {
+    background-color: var(--color-line-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-quiet::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .label-eyebrow {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-ink-muted);
+  }
+
+  .hairline {
+    height: 1px;
+    background-color: var(--color-line);
+  }
 }

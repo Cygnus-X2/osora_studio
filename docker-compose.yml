@@ -1,0 +1,52 @@
+# Osora Studio on a single Hetzner box.
+#
+# Caddy terminates TLS and fetches certificates automatically; the app never
+# sees a certificate. Audio lives on a named volume so a redeploy does not
+# discard measured assets.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      AUDIO_STORAGE_DIR: /data/audio
+    volumes:
+      - audio:/data/audio
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Set OSORA_DOMAIN in .env.production. Without it Caddy serves plain HTTP
+      # on :80, which is fine for an IP-only trial and wrong for anything real.
+      OSORA_DOMAIN: ${OSORA_DOMAIN:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  audio:
+  caddy_data:
+  caddy_config:

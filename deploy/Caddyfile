@@ -1,0 +1,30 @@
+# Caddy obtains and renews certificates on its own, provided OSORA_DOMAIN is a
+# real hostname pointed at this server. Left unset it falls back to :80.
+{$OSORA_DOMAIN} {
+	encode zstd gzip
+
+	# Generated sessions can be long; give uploads and assembly room to finish.
+	request_body {
+		max_size 200MB
+	}
+
+	reverse_proxy app:3000 {
+		flush_interval -1
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
