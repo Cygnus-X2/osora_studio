@@ -19,6 +19,11 @@ import { databaseStatus } from "@/lib/db/client";
 import { relativeTime, titleCase } from "@/lib/format";
 import type { Permission, StudioRole } from "@/domain/types";
 
+// Reports live infrastructure — toolchain, database, provider keys. Prerendering
+// this would bake build-time state into the page, which is how a container with
+// ffmpeg installed ends up claiming ffprobe is missing.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Settings · Osora Studio" };
 
 /** Granular permissions per role. Deliberately narrow by default. */

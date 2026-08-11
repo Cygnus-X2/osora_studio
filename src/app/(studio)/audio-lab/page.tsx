@@ -10,6 +10,10 @@ import { checkAudioToolchain } from "@/providers/audio/ffprobe";
 import { formatSeconds } from "@/domain/timeline/planner";
 import { relativeTime } from "@/lib/format";
 
+// Probes the audio toolchain at request time. Must not be prerendered: the build
+// stage has no ffmpeg, so a static render would report it permanently absent.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Audio Lab · Osora Studio" };
 
 export default async function AudioLabPage() {
