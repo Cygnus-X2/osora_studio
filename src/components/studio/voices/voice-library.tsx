@@ -319,6 +319,11 @@ export function VoiceLibrary({
 
                 <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
                   <p className="truncate font-mono text-[10px] text-ink-faint">{voice.id}</p>
+                  {voice.wordsPerMinute === null && !state?.playbackUrl && approved[voice.id] && (
+                    <span className="shrink-0 text-[10px] text-amber" title="Sessions using this voice will be planned at the default rate">
+                      pace not measured
+                    </span>
+                  )}
                   {voice.wordsPerMinute !== null && !state?.playbackUrl && (
                     <span
                       className={`shrink-0 font-mono text-[10px] ${

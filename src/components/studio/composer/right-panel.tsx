@@ -254,7 +254,9 @@ export function ComposerRightPanel({
                   return (
                     <SelectItem key={voice.id} value={voice.id} disabled={blocked}>
                       {voice.name}
-                      {voice.wordsPerMinute ? ` · ${voice.wordsPerMinute} wpm` : ""}
+                      {voice.wordsPerMinute
+                        ? ` · ${voice.wordsPerMinute} wpm`
+                        : " · pace not measured"}
                       {blocked && " — blocked by boundary"}
                     </SelectItem>
                   );
@@ -267,6 +269,8 @@ export function ComposerRightPanel({
             {voicesAreShortlist
               ? "Shortlisted voices only. Approve more in the voice library."
               : "No voice has been approved yet, so these are the seeded defaults. Approve some in the voice library."}
+            {voices.some((v) => !v.wordsPerMinute) &&
+              " A voice with no measured pace is planned at the default 105 wpm, which will be wrong — generate its sample in the voice library first."}
           </p>
 
           <div className="grid grid-cols-2 gap-3">
