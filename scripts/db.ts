@@ -199,6 +199,13 @@ async function seed() {
            (name, role, organisation, biography, certifications, areas_of_expertise,
             years_of_experience, languages, contribution_count, active, avatar_initials)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         on conflict (name) do update set
+           role = excluded.role, organisation = excluded.organisation,
+           biography = excluded.biography, certifications = excluded.certifications,
+           areas_of_expertise = excluded.areas_of_expertise,
+           years_of_experience = excluded.years_of_experience,
+           languages = excluded.languages, contribution_count = excluded.contribution_count,
+           active = excluded.active, avatar_initials = excluded.avatar_initials
          returning id`,
         [
           p.name, p.role, p.organisation, p.biography, p.certifications, p.areasOfExpertise,
@@ -253,6 +260,7 @@ async function seed() {
     }
     console.log(`  ✓ ${SCIENTIFIC_SOURCES.length} scientific sources and their evidence links`);
 
+    await db.query("delete from osora_dna_profiles where name = $1", [OSORA_DNA.name]);
     await db.query(
       `insert into osora_dna_profiles (name, version, stable, adaptive, rules, active)
        values ($1,$2,$3,$4,$5,true)`,
@@ -275,7 +283,7 @@ async function seed() {
             settings, plan, timeline, constraints, dna_score, required_review_skills,
             contributor_ids, audio_project_id, is_example, version, created_at, updated_at)
          values ($1,$2,$3,$4::experience_status,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,null,true,$19,$20,$21)
-         on conflict (slug) do update set
+         on conflict (slug) where slug is not null do update set
            title = excluded.title, status = excluded.status,
            plan = excluded.plan, timeline = excluded.timeline,
            settings = excluded.settings, dna_score = excluded.dna_score,

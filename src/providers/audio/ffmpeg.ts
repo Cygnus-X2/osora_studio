@@ -113,6 +113,41 @@ export async function assembleProject(options: AssembleOptions): Promise<string>
   return options.outputPath;
 }
 
+/**
+ * Loops a short clip out to `seconds`, with a short crossfade at the seam.
+ *
+ * Providers cap sound generation well below session length, so a bed arrives
+ * as a fragment. A hard repeat leaves an audible click every cycle — which the
+ * flow validator flags as a loop seam — so the tail is faded into the head.
+ */
+export async function loopToLength(
+  inputPath: string,
+  seconds: number,
+  outputPath: string,
+  crossfadeSeconds = 0.75,
+): Promise<string> {
+  await run(
+    FFMPEG,
+    [
+      "-hide_banner",
+      "-y",
+      "-stream_loop",
+      "-1",
+      "-i",
+      inputPath,
+      "-t",
+      String(seconds),
+      "-af",
+      `afade=t=in:st=0:d=${crossfadeSeconds},afade=t=out:st=${Math.max(0, seconds - crossfadeSeconds)}:d=${crossfadeSeconds}`,
+      "-codec:a",
+      "pcm_s16le",
+      outputPath,
+    ],
+    { maxBuffer: 32 * 1024 * 1024 },
+  );
+  return outputPath;
+}
+
 /** Renders exactly `seconds` of digital silence — used for silence clips. */
 export async function renderSilence(
   seconds: number,

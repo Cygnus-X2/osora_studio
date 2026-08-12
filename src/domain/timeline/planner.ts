@@ -313,6 +313,48 @@ export function recomputeBounds(
 }
 
 /**
+ * Redistributes drift into pause and sound-only time so the arrangement lands
+ * on its target, leaving speech untouched.
+ *
+ * Real narration rarely matches an estimate — a hosted voice can run 40%
+ * faster than the planning rate — and the difference has to go somewhere. It
+ * goes into silence, because silence is the one element that can absorb time
+ * without changing what the session asks of anyone. Each block is still held
+ * to its intervention's maximum pause, so a short session cannot become a
+ * long stare into nothing.
+ */
+export function fitToTarget(timeline: SectionTimeline, maxPauseRatio = 0.8): SectionTimeline {
+  const drift = timeline.targetSeconds - timeline.totalSeconds;
+  if (Math.abs(drift) < 1) return timeline;
+
+  const adjustable = timeline.sections.filter(
+    (s) => s.pauseSeconds > 0 || s.soundOnlySeconds > 0 || s.wordCount > 0,
+  );
+  if (adjustable.length === 0) return timeline;
+
+  // Share the difference by how much quiet each section already carries, so a
+  // dense instruction block does not suddenly become the longest silence.
+  const weights = adjustable.map((s) => Math.max(1, s.pauseSeconds + s.soundOnlySeconds));
+  const weightTotal = weights.reduce((a, b) => a + b, 0);
+
+  const sections = timeline.sections.map((section) => {
+    const index = adjustable.indexOf(section);
+    if (index === -1) return section;
+
+    const share = drift * (weights[index] / weightTotal);
+    const speech = section.actualSpeechSeconds ?? section.estimatedSpeechSeconds;
+    const blockTotal = speech + section.pauseSeconds + section.soundOnlySeconds + share;
+    const ceiling = speech > 0 ? (speech / (1 - maxPauseRatio)) * maxPauseRatio : Infinity;
+
+    const nextPause = Math.max(0, Math.min(section.pauseSeconds + share, ceiling));
+    void blockTotal;
+    return { ...section, pauseSeconds: Number(nextPause.toFixed(1)) };
+  });
+
+  return recomputeBounds({ ...timeline, sections });
+}
+
+/**
  * Replaces estimated speech durations with measured ones and re-derives the
  * arrangement. This is the only place the timeline is allowed to learn the
  * truth about how long narration actually is.

@@ -4,9 +4,9 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
 import { analyseAudioFile, compareDuration } from "@/providers/audio/ffprobe";
-import { assembleProject, renderSilence, type ClipSource } from "@/providers/audio/ffmpeg";
+import { assembleProject, loopToLength, renderSilence, type ClipSource } from "@/providers/audio/ffmpeg";
 import { getTtsProvider, type TtsProviderId } from "@/providers/tts";
-import { reconcileTimeline } from "@/domain/timeline/planner";
+import { fitToTarget, reconcileTimeline } from "@/domain/timeline/planner";
 import { ensureBucket, storagePathFor } from "@/lib/paths";
 import { envValue } from "@/lib/env";
 import { saveTimeline, setAudioProject } from "@/lib/db/experiences";
@@ -121,12 +121,20 @@ export async function renderSession(experience: Experience): Promise<RenderResul
     }
   }
 
-  // 3. Reconcile — every estimate is replaced by a measurement.
-  const reconciled = reconcileTimeline(timeline, measured);
+  // 3. Reconcile — every estimate is replaced by a measurement — then absorb
+  //    the difference into pause time so the session still lands on target.
+  const measuredTimeline = reconcileTimeline(timeline, measured);
+  const reconciled = fitToTarget(measuredTimeline);
   steps.push({
     step: "Timeline reconciled",
-    detail: `planned ${formatSpan(timeline.totalSeconds)} → measured ${formatSpan(reconciled.totalSeconds)} against a ${formatSpan(reconciled.targetSeconds)} target`,
+    detail: `planned ${formatSpan(timeline.totalSeconds)} → narration measured at ${formatSpan(measuredTimeline.totalSeconds)}`,
   });
+  if (Math.abs(measuredTimeline.totalSeconds - reconciled.totalSeconds) > 1) {
+    steps.push({
+      step: "Drift absorbed into silence",
+      detail: `${formatSpan(measuredTimeline.totalSeconds)} → ${formatSpan(reconciled.totalSeconds)} against a ${formatSpan(reconciled.targetSeconds)} target — pauses adjusted, narration untouched`,
+    });
+  }
 
   await saveTimeline(
     experience.id,
@@ -162,34 +170,55 @@ export async function renderSession(experience: Experience): Promise<RenderResul
     let bedPath: string;
     let bedSeconds: number;
 
+    let generatedBed: Awaited<ReturnType<typeof ttsProvider.generateAmbientSound>> | null = null;
     if (soundModel) {
-      const bed = await ttsProvider.generateAmbientSound({
+      try {
+        generatedBed = await ttsProvider.generateAmbientSound({
         modelId: soundModel.id,
         prompt: `Continuous ${experience.settings.soundStyle.replace(/_/g, " ")} bed. No transients, no identifiable events.`,
-        requestedDurationSeconds: Math.ceil(totalSeconds),
-        intensity: experience.settings.soundIntensity,
-        loopable: true,
-        seed: null,
-      });
-      bedPath = path.join(generatedDir, `${runId}-bed.${bed.format}`);
-      await writeFile(bedPath, bed.bytes);
-      costEstimateUsd += bed.costEstimateUsd;
+          requestedDurationSeconds: Math.ceil(totalSeconds),
+          intensity: experience.settings.soundIntensity,
+          loopable: true,
+          seed: null,
+        });
+      } catch (cause) {
+        steps.push({
+          step: "Ambient generation refused",
+          detail: `${cause instanceof Error ? cause.message : "unknown"} — falling back to a measured silent bed`,
+        });
+      }
+    }
 
-      const bedAnalysis = await analyseAudioFile(bedPath);
-      bedSeconds = bedAnalysis.durationSeconds;
+    if (generatedBed) {
+      bedPath = path.join(generatedDir, `${runId}-bed.${generatedBed.format}`);
+      await writeFile(bedPath, generatedBed.bytes);
+      costEstimateUsd += generatedBed.costEstimateUsd;
+      bedSeconds = (await analyseAudioFile(bedPath)).durationSeconds;
       steps.push({
         step: "Ambient bed generated",
         detail: `requested ${Math.ceil(totalSeconds)}s · measured ${bedSeconds.toFixed(1)}s`,
       });
+
+      // Providers cap sound generation far below session length, so the bed
+      // usually arrives short. Loop it out rather than letting it stop under
+      // the narration — a bed ending early is a blocking flow failure.
+      if (bedSeconds < totalSeconds - 1) {
+        const loopedPath = path.join(generatedDir, `${runId}-bed-looped.wav`);
+        await loopToLength(bedPath, Math.ceil(totalSeconds), loopedPath);
+        const loopedSeconds = (await analyseAudioFile(loopedPath)).durationSeconds;
+        steps.push({
+          step: "Bed looped to cover narration",
+          detail: `${bedSeconds.toFixed(1)}s → ${loopedSeconds.toFixed(1)}s with a crossfaded seam`,
+        });
+        bedPath = loopedPath;
+        bedSeconds = loopedSeconds;
+      }
     } else {
-      // No sound model — lay down measured silence so the mix still has a
-      // continuous floor and the narration is not sitting on nothing.
+      // Narration must never sit on absolute nothing — a mix with no floor
+      // reads as a dropout rather than as quiet.
       bedPath = await renderSilence(Math.ceil(totalSeconds), path.join(generatedDir, `${runId}-bed.wav`));
       bedSeconds = (await analyseAudioFile(bedPath)).durationSeconds;
-      steps.push({
-        step: "Silent bed rendered",
-        detail: `${bedSeconds.toFixed(1)}s — this provider has no ambient model`,
-      });
+      steps.push({ step: "Silent bed rendered", detail: `${bedSeconds.toFixed(1)}s` });
     }
 
     sources.unshift({

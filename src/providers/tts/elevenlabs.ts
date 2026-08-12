@@ -27,6 +27,9 @@ import type {
 
 const BASE_URL = "https://api.elevenlabs.io/v1";
 
+/** The sound endpoint refuses anything longer; beds are looped to fill. */
+const MAX_SOUND_SECONDS = 22;
+
 const MODELS: TtsModelCapabilities[] = [
   {
     id: "eleven_multilingual_v2",
@@ -62,7 +65,7 @@ const MODELS: TtsModelCapabilities[] = [
     supportsDurationRequest: true,
     maxCharacters: 450,
     languages: [],
-    notes: "Sound only. Accepts a requested duration but frequently returns a different one.",
+    notes: `Sound only. Caps a single request at ${MAX_SOUND_SECONDS}s, so long beds are generated short and looped. Returned duration frequently differs from the request.`,
   },
 ];
 
@@ -166,7 +169,10 @@ export class ElevenLabsProvider implements TtsProvider {
       }),
     });
     if (!response.ok) {
-      throw new Error(`ElevenLabs speech generation failed: ${response.status}`);
+      const detail = await response.text().catch(() => "");
+      throw new Error(
+        `ElevenLabs speech generation failed: ${response.status}${detail ? ` — ${detail.slice(0, 300)}` : ""}`,
+      );
     }
 
     const bytes = new Uint8Array(await response.arrayBuffer());
@@ -201,21 +207,27 @@ export class ElevenLabsProvider implements TtsProvider {
       throw new Error(`Model "${model.label}" does not support sound generation.`);
     }
 
+    // Only the fields the endpoint documents. Sending a model id it does not
+    // recognise is answered with a bare 400, which is a slow thing to debug.
+    // The sound model also caps duration well below a full session, so a long
+    // bed is requested in the longest slice it will accept and looped.
+    const requested = Math.min(settings.requestedDurationSeconds, MAX_SOUND_SECONDS);
+
     const response = await fetch(`${BASE_URL}/sound-generation`, {
       method: "POST",
       headers: this.headers({ "content-type": "application/json", accept: "audio/mpeg" }),
       body: JSON.stringify({
         text: settings.prompt,
-        model_id: settings.modelId,
-        duration_seconds: model.supportsDurationRequest
-          ? settings.requestedDurationSeconds
-          : undefined,
-        loop: settings.loopable,
+        duration_seconds: model.supportsDurationRequest ? requested : undefined,
         prompt_influence: settings.intensity,
       }),
     });
     if (!response.ok) {
-      throw new Error(`ElevenLabs sound generation failed: ${response.status}`);
+      // Carry the provider's own explanation rather than just the status.
+      const detail = await response.text().catch(() => "");
+      throw new Error(
+        `ElevenLabs sound generation failed: ${response.status}${detail ? ` — ${detail.slice(0, 300)}` : ""}`,
+      );
     }
 
     return {
@@ -223,11 +235,13 @@ export class ElevenLabsProvider implements TtsProvider {
       format: "mp3",
       // Requested is not actual. This field records what we asked for; the
       // measured value is written separately after ffprobe runs.
-      reportedDurationSeconds: settings.requestedDurationSeconds,
+      // What the request asked for after capping — billing the uncapped figure
+      // overstated the cost of every long bed by an order of magnitude.
+      reportedDurationSeconds: requested,
       providerRequestId: response.headers.get("request-id") ?? `el_${Date.now()}`,
       model: settings.modelId,
       seed: null,
-      costEstimateUsd: Number((settings.requestedDurationSeconds * 0.008).toFixed(4)),
+      costEstimateUsd: Number((requested * 0.008).toFixed(4)),
     };
   }
 

@@ -32,7 +32,9 @@
       "Bash(ssh -o BatchMode=yes root@168.119.168.191 'cd /srv/osora && docker compose --env-file .env.production -f deploy/docker-compose.behind-proxy.yml build 2>&1 | tail -30')",
       "Bash(git -c 'user.name=Nik Völker' -c user.email=niklas.voelker@eigenblue.ai commit -q -m 'Document the self-hosted deployment topology *)",
       "Bash(lsof -ti:3200)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(ssh -o BatchMode=yes root@168.119.168.191 'cd /srv/osora && \\\\ *)",
+      "Bash(rsync -az --exclude node_modules --exclude .next --exclude .git --exclude .env.local --exclude .env.production ./ root@168.119.168.191:/srv/osora/)"
     ]
   }
 }
