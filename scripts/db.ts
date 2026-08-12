@@ -10,9 +10,25 @@
  * skipped, and the seed is idempotent via ON CONFLICT.
  */
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
+
+// Next loads .env.local automatically; a plain script does not. Without this,
+// `npm run db:status` fails on a machine that is otherwise correctly set up —
+// which reads as a broken database rather than an unloaded file.
+// In the container nothing is loaded here and the real environment wins.
+for (const file of [".env.local", ".env"]) {
+  const candidate = path.join(process.cwd(), file);
+  if (existsSync(candidate)) {
+    try {
+      process.loadEnvFile(candidate);
+    } catch {
+      // Older runtimes lack loadEnvFile; the environment is then the only source.
+    }
+  }
+}
 
 import { STATE_DIMENSIONS } from "../src/domain/state/dimensions";
 import { MECHANISMS } from "../src/domain/mechanisms/library";
@@ -27,7 +43,11 @@ const MIGRATIONS_DIR = path.join(process.cwd(), "supabase", "migrations");
 function connectionString(): string {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) {
-    console.error("DATABASE_URL is not set.");
+    console.error(
+      "DATABASE_URL is not set.\n\n" +
+        "  Locally : add it to .env.local, or run ./deploy/local-setup.sh\n" +
+        "  Server  : it comes from .env.production via docker compose",
+    );
     process.exit(1);
   }
   return url;
