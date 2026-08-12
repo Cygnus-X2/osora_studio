@@ -27,7 +27,7 @@ export interface StoredAudioFile {
   error: string | null;
 }
 
-const BUCKETS: AudioBucket[] = ["generated", "uploads", "processed", "exports"];
+const BUCKETS: AudioBucket[] = ["generated", "uploads", "processed", "exports", "previews"];
 const AUDIO_EXTENSIONS = [".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac", ".aiff"];
 
 /** Newest first, capped so a large volume cannot stall a page render. */

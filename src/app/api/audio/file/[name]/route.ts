@@ -15,7 +15,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".flac": "audio/flac",
 };
 
-const BUCKETS: AudioBucket[] = ["generated", "processed", "exports", "uploads"];
+const BUCKETS: AudioBucket[] = ["generated", "processed", "exports", "uploads", "previews"];
 
 /**
  * Serves a stored file back for audition.

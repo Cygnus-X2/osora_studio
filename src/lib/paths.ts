@@ -14,7 +14,7 @@ import { envValue } from "./env";
  * nothing set it falls back to the system temp directory, which is right for
  * local development and wrong for anything that needs to survive a restart.
  */
-export type AudioBucket = "generated" | "uploads" | "processed" | "exports";
+export type AudioBucket = "generated" | "uploads" | "processed" | "exports" | "previews";
 
 const ROOT = envValue("AUDIO_STORAGE_DIR") ?? path.join(tmpdir(), "osora-audio");
 
