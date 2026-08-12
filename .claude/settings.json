@@ -30,7 +30,9 @@
       "Bash(git push *)",
       "Bash(ssh -o BatchMode=yes root@168.119.168.191 'cd /srv/osora && docker compose -f deploy/docker-compose.behind-proxy.yml build 2>&1 | tail -25')",
       "Bash(ssh -o BatchMode=yes root@168.119.168.191 'cd /srv/osora && docker compose --env-file .env.production -f deploy/docker-compose.behind-proxy.yml build 2>&1 | tail -30')",
-      "Bash(git -c 'user.name=Nik Völker' -c user.email=niklas.voelker@eigenblue.ai commit -q -m 'Document the self-hosted deployment topology *)"
+      "Bash(git -c 'user.name=Nik Völker' -c user.email=niklas.voelker@eigenblue.ai commit -q -m 'Document the self-hosted deployment topology *)",
+      "Bash(lsof -ti:3200)",
+      "Bash(xargs kill -9)"
     ]
   }
 }

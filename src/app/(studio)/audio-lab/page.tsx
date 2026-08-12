@@ -6,9 +6,10 @@ import { AudioUploadPanel } from "@/components/studio/audio/upload-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { store } from "@/data/store";
+import { listStoredAudio } from "@/lib/audio-inventory";
 import { checkAudioToolchain } from "@/providers/audio/ffprobe";
 import { formatSeconds } from "@/domain/timeline/planner";
-import { relativeTime } from "@/lib/format";
+import { formatBytes, relativeTime } from "@/lib/format";
 
 // Probes the audio toolchain at request time. Must not be prerendered: the build
 // stage has no ffmpeg, so a static render would report it permanently absent.
@@ -20,6 +21,7 @@ export default async function AudioLabPage() {
   const projects = store.audioProjects();
   const assets = store.audioAssets();
   const toolchain = await checkAudioToolchain();
+  const onDisk = await listStoredAudio();
 
   const unmeasured = assets.filter((a) => a.actualDurationSeconds === null);
   const drifted = assets.filter(
@@ -170,14 +172,78 @@ export default async function AudioLabPage() {
 
         <div>
           <SectionHeading
-            title="All assets"
-            description="Generated and uploaded audio are stored separately and measured identically."
+            title="On disk"
+            description={
+              onDisk.length === 0
+                ? "Nothing generated or uploaded on this server yet."
+                : `${onDisk.length} file(s) on the storage volume, measured just now by reading them.`
+            }
+          />
+          <Card>
+            <CardContent className="p-0">
+              {onDisk.length === 0 ? (
+                <p className="px-4 py-6 text-center text-[13px] text-ink-muted">
+                  Generate or upload something above and it will appear here — measured, not
+                  described.
+                </p>
+              ) : (
+                <div className="divide-y divide-line">
+                  {onDisk.map((file) => (
+                    <div key={file.storagePath} className="px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
+                          {file.fileName}
+                        </p>
+                        <Badge tone={file.analysis ? "sage" : "rust"}>
+                          {file.analysis ? "Measured" : "Unmeasurable"}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
+                        <span className="text-ink-faint">{file.bucket}</span>
+                        {file.analysis && (
+                          <>
+                            <span className="font-mono text-ink-soft">
+                              {formatSeconds(file.analysis.durationSeconds)}
+                            </span>
+                            <span className="font-mono text-ink-faint">
+                              {file.analysis.codec} · {file.analysis.channels}ch ·{" "}
+                              {(file.analysis.sampleRate / 1000).toFixed(1)}k
+                            </span>
+                          </>
+                        )}
+                        <span className="font-mono text-ink-faint">
+                          {formatBytes(file.sizeBytes)}
+                        </span>
+                        <span className="text-ink-muted">{relativeTime(file.createdAt)}</span>
+                      </div>
+                      {file.error && (
+                        <p className="mt-1 text-[12px] leading-5 text-rust">{file.error}</p>
+                      )}
+                      <audio
+                        controls
+                        preload="none"
+                        src={file.playbackUrl}
+                        className="mt-2 h-8 w-full"
+                        aria-label={`Play ${file.fileName}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <SectionHeading
+            className="mt-6"
+            title="Seeded examples"
+            description="Illustrative fixtures, not files. They exist to show the shape of requested-versus-measured drift before you have generated anything."
+            actions={<Badge tone="amber">Demo data — no file behind these</Badge>}
           />
           <Card>
             <CardContent className="p-0">
               <div className="divide-y divide-line">
                 {assets.map((asset) => (
-                  <div key={asset.id} className="px-4 py-3">
+                  <div key={asset.id} className="px-4 py-3 opacity-70">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
                         {asset.name}
@@ -199,12 +265,6 @@ export default async function AudioLabPage() {
                           : "—"}
                       </span>
                       <DeltaValue seconds={asset.durationDeltaSeconds} tolerance={5} />
-                      {asset.analysis && (
-                        <span className="font-mono text-ink-faint">
-                          {asset.analysis.codec} · {asset.analysis.channels}ch ·{" "}
-                          {(asset.analysis.sampleRate / 1000).toFixed(1)}k
-                        </span>
-                      )}
                     </div>
                     {asset.error && (
                       <p className="mt-1 text-[12px] leading-5 text-rust">{asset.error}</p>

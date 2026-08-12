@@ -12,7 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ruleSummaryFor, store } from "@/data/store";
+import { ruleSummaryFor } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { analyseDrift, formatSeconds } from "@/domain/timeline/planner";
 import { relativeTime, titleCase } from "@/lib/format";
 import type { ExperienceStatus } from "@/domain/types";
@@ -37,8 +38,8 @@ const PIPELINE: ExperienceStatus[] = [
   "archived",
 ];
 
-export default function ExperiencesPage() {
-  const experiences = store.experiences();
+export default async function ExperiencesPage() {
+  const experiences = await allExperiences();
   const byStatus = PIPELINE.map((status) => ({
     status,
     count: experiences.filter((e) => e.status === status).length,
@@ -52,7 +53,7 @@ export default function ExperiencesPage() {
         description="Every session carries its plan, its timeline, its rule results and its review requirements together. A session is not a document — it is a decision with an audio file attached."
         actions={
           <Button asChild variant="clay">
-            <Link href="/composer">New session</Link>
+            <Link href="/composer/new">New session</Link>
           </Button>
         }
       />

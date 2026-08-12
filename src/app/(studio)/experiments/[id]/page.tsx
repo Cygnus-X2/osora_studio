@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { store } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { profileDelta } from "@/domain/state/dimensions";
 import { titleCase } from "@/lib/format";
 
@@ -25,6 +26,7 @@ export default async function ExperimentDetailPage({
 
   const control = experiment.variants.find((v) => v.isControl);
   const outcomes = store.outcomes();
+  const experiences = await allExperiences();
 
   // Recompute the arm summaries from the recorded outcomes rather than trusting
   // the stored headline numbers — the screen should agree with the data.
@@ -294,8 +296,7 @@ export default async function ExperimentDetailPage({
               <CardTitle>Sessions in this experiment</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {store
-                .experiences()
+              {experiences
                 .filter((e) => e.experimentId === experiment.id)
                 .map((e) => (
                   <Link

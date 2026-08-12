@@ -12,10 +12,11 @@ import {
   summariseOutcomes,
 } from "@/domain/outcomes/attribution";
 import type { Experience, FlowAnalysis, RuleResult } from "@/domain/types";
+import { allExperiences, findExperience } from "./source";
 import { AUDIO_ASSETS, SOUND_ASSETS, VOICES } from "./seed/audio-library";
 import { OSORA_DNA } from "./seed/dna";
 import { EVIDENCE_LINKS, SCIENTIFIC_SOURCES } from "./seed/evidence";
-import { EXPERIENCES, EXPERIENCE_BY_ID, EXPERIENCE_VERSIONS, USER_CONSTRAINT_SETS } from "./seed/experiences";
+import { EXPERIENCES, EXPERIENCE_BY_ID, USER_CONSTRAINT_SETS } from "./seed/experiences";
 import { EXPERIMENTS, SESSION_OUTCOMES } from "./seed/experiments";
 import { CURRENT_USER_ID, MOCK_USERS, PROFESSIONALS } from "./seed/people";
 import {
@@ -44,10 +45,9 @@ export const store = {
   dna: () => OSORA_DNA,
   sources: () => SCIENTIFIC_SOURCES,
   evidenceLinks: () => EVIDENCE_LINKS,
-  experiences: () => EXPERIENCES,
-  experience: (id: string): Experience | undefined => EXPERIENCE_BY_ID[id],
-  experienceVersions: (id: string) =>
-    EXPERIENCE_VERSIONS.filter((v) => v.experienceId === id).sort((a, b) => b.version - a.version),
+  /** Shipped examples only. Live sessions come from `allExperiences()`. */
+  seededExperiences: () => EXPERIENCES,
+  seededExperience: (id: string): Experience | undefined => EXPERIENCE_BY_ID[id],
   constraintSets: () => USER_CONSTRAINT_SETS,
   experiments: () => EXPERIMENTS,
   outcomes: () => SESSION_OUTCOMES,
@@ -122,8 +122,8 @@ export function flowAnalysisFor(experience: Experience): FlowAnalysis | null {
   return analysis;
 }
 
-export function outcomeAttribution() {
-  const input = { outcomes: SESSION_OUTCOMES, experiences: EXPERIENCES };
+export async function outcomeAttribution() {
+  const input = { outcomes: SESSION_OUTCOMES, experiences: await allExperiences() };
   return {
     summary: summariseOutcomes(SESSION_OUTCOMES),
     dimensions: dimensionDeltas(SESSION_OUTCOMES),
@@ -138,8 +138,8 @@ export function outcomeAttribution() {
 }
 
 /** Everything the dashboard needs, computed from the same engines as the detail screens. */
-export function dashboardData() {
-  const experiences = store.experiences();
+export async function dashboardData() {
+  const experiences = await allExperiences();
 
   const recentlyEdited = [...experiences]
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
@@ -190,17 +190,16 @@ export function dashboardData() {
     unmeasuredAssets,
     activeExperiments,
     recentAssets,
-    outcomes: outcomeAttribution(),
+    outcomes: await outcomeAttribution(),
     auditLog: store.auditLog().slice(0, 6),
   };
 }
 
 /** Review queue rows, joined across requirements, reviews and skills. */
-export function reviewQueue() {
-  return store
-    .reviewRequirements()
-    .map((requirement) => {
-      const experience = store.experience(requirement.experienceId);
+export async function reviewQueue() {
+  const rows = await Promise.all(
+    store.reviewRequirements().map(async (requirement) => {
+      const experience = await findExperience(requirement.experienceId);
       const review = requirement.satisfiedByReviewId
         ? store.reviews().find((r) => r.id === requirement.satisfiedByReviewId)
         : store
@@ -216,7 +215,10 @@ export function reviewQueue() {
         .filter((p) => p.active && p.reviewPermissions.includes(requirement.requiredSkill));
 
       return { requirement, experience, review, qualified };
-    })
+    }),
+  );
+
+  return rows
     .filter((row) => row.experience !== undefined)
     .sort((a, b) => {
       const aDone = a.review?.decision === "approved" ? 1 : 0;

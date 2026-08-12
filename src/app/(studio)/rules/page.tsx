@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RULES } from "@/domain/rules/registry";
 import { CLAIM_PATTERNS } from "@/domain/safety/claims";
-import { ruleResultsFor, store } from "@/data/store";
+import { ruleResultsFor } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { titleCase } from "@/lib/format";
 import type { RuleCategory } from "@/domain/types";
 
@@ -21,8 +22,8 @@ const CATEGORY_ORDER: RuleCategory[] = [
   "licensing",
 ];
 
-export default function RulesPage() {
-  const experiences = store.experiences();
+export default async function RulesPage() {
+  const experiences = await allExperiences();
 
   // Live pass/fail counts per rule, computed from the same validators the
   // composer uses — the rules screen and the session screen cannot disagree.

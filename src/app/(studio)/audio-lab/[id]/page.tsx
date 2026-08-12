@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { flowAnalysisFor, store } from "@/data/store";
+import { findExperience } from "@/data/source";
 import { buildFilterGraph } from "@/providers/audio/ffmpeg";
 import { formatSeconds } from "@/domain/timeline/planner";
 import { formatBytes } from "@/lib/format";
@@ -25,7 +26,7 @@ export default async function AudioProjectPage({
   const project = store.audioProject(id);
   if (!project) notFound();
 
-  const experience = project.experienceId ? store.experience(project.experienceId) : undefined;
+  const experience = project.experienceId ? await findExperience(project.experienceId) : undefined;
   const flow = experience ? flowAnalysisFor(experience) : null;
   const delta = Number((project.arrangedSeconds - project.targetSeconds).toFixed(1));
 

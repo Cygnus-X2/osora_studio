@@ -6,13 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { reviewQueue, ruleResultsFor, store } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { SKILL_LABELS } from "@/data/seed/people";
 import { relativeTime, titleCase } from "@/lib/format";
 
 export const metadata = { title: "Reviews · Osora Studio" };
 
-export default function ReviewsPage() {
-  const queue = reviewQueue();
+export default async function ReviewsPage() {
+  const queue = await reviewQueue();
+  const experiences = await allExperiences();
   const outstanding = queue.filter((row) => row.review?.decision !== "approved");
   const blocking = outstanding.filter((row) => row.requirement.blocking);
   const unstaffed = outstanding.filter((row) => row.qualified.length === 0);
@@ -193,7 +195,7 @@ export default function ReviewsPage() {
               .slice()
               .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
               .map((review) => {
-                const experience = store.experience(review.experienceId);
+                const experience = experiences.find((e) => e.id === review.experienceId);
                 return (
                   <div key={review.id} className="px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">

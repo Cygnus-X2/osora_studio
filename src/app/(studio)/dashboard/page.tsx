@@ -26,7 +26,7 @@ import { formatSeconds } from "@/domain/timeline/planner";
 import { relativeTime } from "@/lib/format";
 
 const QUICK_ACTIONS = [
-  { label: "Create session", href: "/composer", icon: Sparkles },
+  { label: "Create session", href: "/composer/new", icon: Sparkles },
   { label: "Add mechanism", href: "/mechanisms", icon: Layers },
   { label: "Add intervention", href: "/interventions", icon: Plus },
   { label: "Add scientific source", href: "/evidence", icon: BookMarked },
@@ -36,8 +36,8 @@ const QUICK_ACTIONS = [
   { label: "Review session", href: "/reviews", icon: CheckSquare },
 ];
 
-export default function DashboardPage() {
-  const data = dashboardData();
+export default async function DashboardPage() {
+  const data = await dashboardData();
   const blockingCount = data.failedValidations.reduce(
     (sum, entry) => sum + entry.failures.filter((f) => f.severity === "blocking").length,
     0,
@@ -51,7 +51,7 @@ export default function DashboardPage() {
         description="Seven sessions in flight, four blocking reviews outstanding, and one audio asset that failed measurement. Nothing publishes until those clear."
         actions={
           <Button asChild variant="clay">
-            <Link href="/composer">
+            <Link href="/composer/new">
               <Sparkles /> New session
             </Link>
           </Button>

@@ -4,19 +4,9 @@ import { useState } from "react";
 import {
   AudioLines,
   CheckCircle2,
-  FileText,
   Gauge,
-  Layers,
-  ListOrdered,
   Loader2,
-  Mic2,
-  Ruler,
-  Save,
-  Send,
-  ShieldCheck,
-  Sparkles,
   Split,
-  Waves,
   Wand2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -25,9 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SessionActions } from "./session-actions";
 import type { ComposerSettings, Voice } from "@/domain/types";
 
 interface RightPanelProps {
+  experienceId: string;
+  hasScript: boolean;
+  canEdit: boolean;
   settings: ComposerSettings;
   voices: Voice[];
   soundStyles: string[];
@@ -38,30 +32,20 @@ interface RightPanelProps {
   blockedVoiceIds: string[];
 }
 
-const ACTIONS = [
-  { key: "recommend", label: "Recommend mechanisms", icon: Layers, group: "engine" },
-  { key: "rank", label: "Rank interventions", icon: ListOrdered, group: "engine" },
-  { key: "outline", label: "Build session outline", icon: FileText, group: "engine" },
-  { key: "script", label: "Generate script", icon: Sparkles, group: "text" },
-  { key: "improve", label: "Improve selected section", icon: Wand2, group: "text" },
-  { key: "alternative", label: "Create alternative", icon: Split, group: "text" },
-  { key: "constraints", label: "Validate constraints", icon: ShieldCheck, group: "check" },
-  { key: "claims", label: "Check scientific claims", icon: CheckCircle2, group: "check" },
-  { key: "narration", label: "Generate narration", icon: Mic2, group: "audio" },
-  { key: "sounds", label: "Generate sounds", icon: Waves, group: "audio" },
-  { key: "assemble", label: "Assemble audio", icon: AudioLines, group: "audio" },
-  { key: "measure", label: "Analyse duration", icon: Ruler, group: "audio" },
-  { key: "flow", label: "Validate flow", icon: Gauge, group: "check" },
+const ADVISORY_ACTIONS = [
+  { key: "improve", label: "Improve selected section", icon: Wand2 },
+  { key: "alternative", label: "Create alternative", icon: Split },
+  { key: "claims", label: "Check scientific claims", icon: CheckCircle2 },
+  { key: "flow", label: "Re-run flow validation", icon: Gauge },
+  { key: "assemble", label: "Open in Audio Lab", icon: AudioLines },
 ] as const;
 
-const GROUP_LABELS: Record<string, string> = {
-  engine: "State Engine — deterministic",
-  text: "Composition — model output is a draft",
-  check: "Validation",
-  audio: "Production",
-};
+
 
 export function ComposerRightPanel({
+  experienceId,
+  hasScript,
+  canEdit,
   settings,
   voices,
   soundStyles,
@@ -84,11 +68,6 @@ export function ComposerRightPanel({
     window.setTimeout(() => setRunning(null), 900);
   }
 
-  const grouped = ["engine", "text", "check", "audio"].map((group) => ({
-    group,
-    actions: ACTIONS.filter((a) => a.group === group),
-  }));
-
   return (
     <Tabs defaultValue="actions" className="flex h-full flex-col">
       <div className="border-b border-line px-3 py-2">
@@ -107,38 +86,45 @@ export function ComposerRightPanel({
 
       <div className="scroll-quiet flex-1 overflow-y-auto px-4 py-4">
         <TabsContent value="actions" className="mt-0 space-y-5">
-          {grouped.map(({ group, actions }) => (
-            <section key={group}>
-              <p className="label-eyebrow mb-2">{GROUP_LABELS[group]}</p>
-              <div className="space-y-1">
-                {actions.map((action) => {
-                  const Icon = action.icon;
-                  const isRunning = running === action.key;
-                  return (
-                    <Button
-                      key={action.key}
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-start"
-                      disabled={isRunning}
-                      onClick={() => run(action.key)}
-                    >
-                      {isRunning ? <Loader2 className="animate-spin" /> : <Icon />}
-                      {action.label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+          <section>
+            <p className="label-eyebrow mb-2">Pipeline</p>
+            <SessionActions
+              experienceId={experienceId}
+              hasScript={hasScript}
+              canEdit={canEdit}
+            />
+          </section>
 
-          <section className="space-y-1 border-t border-line pt-4">
-            <Button variant="subtle" size="sm" className="w-full justify-start">
-              <Save /> Save version
-            </Button>
-            <Button variant="clay" size="sm" className="w-full justify-start">
-              <Send /> Submit for review
-            </Button>
+          <section>
+            <p className="label-eyebrow mb-2">
+              Not yet wired
+              <span className="ml-1.5 normal-case tracking-normal text-ink-faint">
+                shown so the gap is visible
+              </span>
+            </p>
+            <div className="space-y-1">
+              {ADVISORY_ACTIONS.map((action) => {
+                const Icon = action.icon;
+                const isRunning = running === action.key;
+                return (
+                  <Button
+                    key={action.key}
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start opacity-60"
+                    disabled={isRunning}
+                    onClick={() => run(action.key)}
+                  >
+                    {isRunning ? <Loader2 className="animate-spin" /> : <Icon />}
+                    {action.label}
+                  </Button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-ink-faint">
+              These have implementations behind them but no handler yet. They do nothing when
+              pressed, and say so rather than pretending.
+            </p>
           </section>
         </TabsContent>
 

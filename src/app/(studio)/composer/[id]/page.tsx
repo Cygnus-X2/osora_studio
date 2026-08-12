@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { flowAnalysisFor, ruleResultsFor, ruleSummaryFor, store } from "@/data/store";
+import { experienceVersions, findExperience } from "@/data/source";
 import { PROFESSIONAL_BY_ID, SKILL_LABELS } from "@/data/seed/people";
 import { resolveConstraints } from "@/domain/constraints/catalog";
 import { INTERVENTION_BY_KEY } from "@/domain/interventions/library";
@@ -24,9 +25,8 @@ import { analyseDrift, formatSeconds } from "@/domain/timeline/planner";
 import { titleCase } from "@/lib/format";
 import type { ProfessionalSkillKey, TimelineSection } from "@/domain/types";
 
-export function generateStaticParams() {
-  return store.experiences().map((experience) => ({ id: experience.id }));
-}
+// Sessions are created at runtime, so the set is not knowable at build time.
+export const dynamic = "force-dynamic";
 
 const PERSPECTIVES = (
   [
@@ -192,7 +192,7 @@ export default async function ComposerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const experience = store.experience(id);
+  const experience = await findExperience(id);
   if (!experience) notFound();
 
   const plan = experience.plan;
@@ -274,7 +274,7 @@ export default async function ComposerDetailPage({
         <aside className="border-b border-line bg-canvas-sunk/60 xl:border-b-0 xl:border-r">
           <ComposerLeftPanel
             experience={experience}
-            versions={store.experienceVersions(experience.id)}
+            versions={await experienceVersions(experience.id)}
             comments={store.comments(experience.id)}
             reviews={store.reviews().filter((r) => r.experienceId === experience.id)}
             contributors={contributors}
@@ -691,6 +691,9 @@ export default async function ComposerDetailPage({
 
         <aside className="border-t border-line bg-canvas-sunk/60 xl:border-l xl:border-t-0">
           <ComposerRightPanel
+            experienceId={experience.id}
+            hasScript={(timeline?.sections ?? []).some((s) => s.text.trim().length > 0)}
+            canEdit={!["published", "archived", "approved"].includes(experience.status)}
             settings={experience.settings}
             voices={store.voices()}
             soundStyles={["low_bed", "warm_drone", "soft_air", "near_silence", "slow_pulse"]}

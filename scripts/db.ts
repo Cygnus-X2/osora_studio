@@ -20,6 +20,7 @@ import { INTERVENTIONS } from "../src/domain/interventions/library";
 import { SCIENTIFIC_SOURCES } from "../src/data/seed/evidence";
 import { PROFESSIONALS } from "../src/data/seed/people";
 import { OSORA_DNA } from "../src/data/seed/dna";
+import { EXPERIENCES } from "../src/data/seed/experiences";
 
 const MIGRATIONS_DIR = path.join(process.cwd(), "supabase", "migrations");
 
@@ -262,6 +263,55 @@ async function seed() {
       ],
     );
     console.log("  ✓ Osora DNA profile");
+
+    // The shipped example sessions go in as real rows flagged `is_example`, so
+    // the studio has one source of truth rather than a database beside a set of
+    // fixtures that drift apart.
+    for (const e of EXPERIENCES) {
+      const { rows } = await db.query<{ id: string }>(
+        `insert into experiences
+           (slug, title, internal_title, status, current_state, desired_state, target_outcome,
+            duration_seconds, familiarity_ratio, exploration_ratio, scientific_confidence,
+            settings, plan, timeline, constraints, dna_score, required_review_skills,
+            contributor_ids, audio_project_id, is_example, version, created_at, updated_at)
+         values ($1,$2,$3,$4::experience_status,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,null,true,$19,$20,$21)
+         on conflict (slug) do update set
+           title = excluded.title, status = excluded.status,
+           plan = excluded.plan, timeline = excluded.timeline,
+           settings = excluded.settings, dna_score = excluded.dna_score,
+           constraints = excluded.constraints
+         returning id`,
+        [
+          e.id, e.title, e.internalTitle, e.status,
+          JSON.stringify(e.currentState), JSON.stringify(e.desired), e.targetOutcome,
+          e.durationSeconds, e.plan?.familiarityRatio ?? null, e.plan?.explorationRatio ?? null,
+          e.scientificConfidence, JSON.stringify(e.settings), JSON.stringify(e.plan),
+          JSON.stringify(e.timeline), JSON.stringify(e.constraints), JSON.stringify(e.dnaScore),
+          e.requiredReviewSkills, e.contributorIds, e.version, e.createdAt, e.updatedAt,
+        ],
+      );
+
+      const experienceId = rows[0].id;
+      await db.query("delete from session_sections where experience_id = $1", [experienceId]);
+      for (const section of e.timeline?.sections ?? []) {
+        await db.query(
+          `insert into session_sections
+             (experience_id, section_key, ordinal, kind, title, mechanism_key, intervention_key,
+              body, word_count, word_budget, estimated_speech_seconds, actual_speech_seconds,
+              pause_seconds, sound_only_seconds, transition_seconds, start_seconds, end_seconds,
+              evidence_source_ids)
+           values ($1,$2,$3,$4::section_kind,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+          [
+            experienceId, section.id, section.order, section.kind, section.title,
+            section.mechanism, section.interventionKey, section.text, section.wordCount,
+            section.wordBudget, section.estimatedSpeechSeconds, section.actualSpeechSeconds,
+            section.pauseSeconds, section.soundOnlySeconds, section.transitionSeconds,
+            section.startSeconds, section.endSeconds, section.evidenceSourceIds,
+          ],
+        );
+      }
+    }
+    console.log(`  ✓ ${EXPERIENCES.length} example sessions with their sections`);
 
     console.log("Seed complete.");
   } finally {

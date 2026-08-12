@@ -4,6 +4,7 @@ import { ScoreBar } from "@/components/studio/indicators";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { store } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { DNA_RULE_NOTES } from "@/data/seed/dna";
 import { nextExplorationRatio } from "@/domain/dna/score";
 import { titleCase } from "@/lib/format";
@@ -11,9 +12,9 @@ import { PREFERENCES, BOUNDARIES } from "@/domain/constraints/catalog";
 
 export const metadata = { title: "Osora DNA · Osora Studio" };
 
-export default function DnaPage() {
+export default async function DnaPage() {
   const dna = store.dna();
-  const experiences = store.experiences();
+  const experiences = await allExperiences();
   const scored = experiences.filter((e) => e.dnaScore !== null);
   const meanScore =
     scored.reduce((sum, e) => sum + (e.dnaScore?.total ?? 0), 0) / (scored.length || 1);

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { store } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { SKILL_LABELS } from "@/data/seed/people";
 import type { ProfessionalSkillKey } from "@/domain/types";
 
@@ -21,10 +22,10 @@ const SKILL_TRIGGERS: Array<{ trigger: string; skill: ProfessionalSkillKey }> = 
   { trigger: "Cognitive or emotional-exposure content", skill: "clinical_psychology" },
 ];
 
-export default function ProfessionalsPage() {
+export default async function ProfessionalsPage() {
   const professionals = store.professionals();
   const requirements = store.reviewRequirements();
-  const experiences = store.experiences();
+  const experiences = await allExperiences();
 
   // A requirement with no active, permitted professional is a real gap.
   const coverage = SKILL_TRIGGERS.map((entry) => {

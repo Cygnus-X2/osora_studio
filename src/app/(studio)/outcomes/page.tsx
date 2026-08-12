@@ -78,8 +78,8 @@ function AttributionTable({
   );
 }
 
-export default function OutcomesPage() {
-  const data = outcomeAttribution();
+export default async function OutcomesPage() {
+  const data = await outcomeAttribution();
   const outcomes = store.outcomes();
 
   const dislikes = outcomes.flatMap((o) => o.dislikes);

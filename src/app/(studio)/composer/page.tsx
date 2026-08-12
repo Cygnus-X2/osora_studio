@@ -1,17 +1,18 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { PageHeader } from "@/components/studio/page-header";
 import { ExperienceStatusBadge } from "@/components/studio/indicators";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { store } from "@/data/store";
+import { allExperiences } from "@/data/source";
 import { formatSeconds } from "@/domain/timeline/planner";
 import { relativeTime } from "@/lib/format";
 
 export const metadata = { title: "Session Composer · Osora Studio" };
 
-export default function ComposerIndexPage() {
-  const experiences = store.experiences();
+export default async function ComposerIndexPage() {
+  const experiences = await allExperiences();
 
   return (
     <>
@@ -19,6 +20,13 @@ export default function ComposerIndexPage() {
         eyebrow="Session Composer"
         title="Choose a session to compose"
         description="The composer runs the State Engine, plans a deterministic timeline, and only then lets a model write text into budgets it cannot exceed."
+        actions={
+          <Button asChild variant="clay">
+            <Link href="/composer/new">
+              <Plus /> New session
+            </Link>
+          </Button>
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2">
