@@ -17,6 +17,7 @@ import type {
   UserConstraint,
 } from "@/domain/types";
 import { OSORA_DNA } from "@/data/seed/dna";
+import { envValue } from "@/lib/env";
 import { VOICES } from "@/data/seed/audio-library";
 import { isDatabaseConfigured, query } from "./client";
 import { listStudioVoices } from "./voices";
@@ -133,7 +134,8 @@ export interface CreateExperienceInput {
 
 function defaultSettings(overrides: Partial<ComposerSettings> = {}): ComposerSettings {
   return {
-    llmProvider: "mock",
+    llmProvider: envValue("LLM_PROVIDER") ?? "mock",
+    ttsProvider: envValue("TTS_PROVIDER") ?? "mock",
     llmModel: "mock-composer-1",
     temperature: 0.4,
     promptTemplate: "osora-compose-v3",

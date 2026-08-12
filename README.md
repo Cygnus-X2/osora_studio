@@ -22,17 +22,35 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-No configuration is required. The first milestone runs entirely on seeded data
-with mock providers. You do need **ffmpeg** on your PATH — audio measurement is
-mandatory, not best-effort, and the Audio Lab will tell you if it is missing.
+That runs on seeded data with mock providers. You do need **ffmpeg** on your
+PATH — audio measurement is mandatory, not best-effort, and the Audio Lab will
+tell you if it is missing.
 
 ```bash
 brew install ffmpeg          # macOS
 apt-get install ffmpeg       # Debian/Ubuntu
 ```
 
-Copy `.env.example` to `.env.local` when you want to attach a real Supabase
-project or a live LLM/TTS provider.
+### Full-fidelity local development
+
+Verify locally, deploy when it works. A local setup that differs from
+production in the ways that matter is worse than none, because it moves bugs
+later rather than removing them — so this matches the server's Postgres major
+version, uses the real ffmpeg, and talks to the same providers.
+
+```bash
+brew install postgresql@16 && brew services start postgresql@16
+./deploy/local-setup.sh
+```
+
+Then put your provider keys in `.env.local`. With `TTS_PROVIDER=elevenlabs` and
+a key, everything the deployed studio does — creating sessions, generating
+scripts, rendering audio, measuring it — happens locally in seconds instead of
+behind a container rebuild.
+
+The bugs that genuinely need a deploy to find are the ones about the
+*environment*: a binary absent from the runtime image, a blank environment
+variable, a partial index. Everything else should be caught before it ships.
 
 ---
 

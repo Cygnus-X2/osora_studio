@@ -729,6 +729,8 @@ export type ExperienceStatus =
 
 export interface ComposerSettings {
   llmProvider: string;
+  /** Which voice provider renders this session. Falls back to the server default. */
+  ttsProvider?: string;
   llmModel: string;
   temperature: number;
   promptTemplate: string;

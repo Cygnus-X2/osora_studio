@@ -17,6 +17,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { flowAnalysisFor, ruleResultsFor, ruleSummaryFor, store } from "@/data/store";
 import { experienceVersions, findExperience } from "@/data/source";
 import { listStudioVoices } from "@/lib/db/voices";
+import { llmProviderAvailability } from "@/providers/llm";
+import { ttsProviderAvailability } from "@/providers/tts";
+import { envValue } from "@/lib/env";
 import { PROFESSIONAL_BY_ID, SKILL_LABELS } from "@/data/seed/people";
 import { resolveConstraints } from "@/domain/constraints/catalog";
 import { INTERVENTION_BY_KEY } from "@/domain/interventions/library";
@@ -722,16 +725,11 @@ export default async function ComposerDetailPage({
             voices={voiceOptions}
             voicesAreShortlist={shortlist.length > 0}
             soundStyles={["low_bed", "warm_drone", "soft_air", "near_silence", "slow_pulse"]}
-            llmProviders={[
-              { id: "mock", label: "Mock provider", configured: true },
-              { id: "anthropic", label: "Anthropic", configured: false },
-              { id: "openai", label: "OpenAI", configured: false },
-              { id: "gemini", label: "Google Gemini", configured: false },
-            ]}
-            ttsProviders={[
-              { id: "mock", label: "Mock voice & sound", configured: true },
-              { id: "elevenlabs", label: "ElevenLabs", configured: false },
-            ]}
+            llmProviders={llmProviderAvailability()}
+            ttsProviders={ttsProviderAvailability()}
+            activeTtsProvider={
+              experience.settings.ttsProvider ?? envValue("TTS_PROVIDER") ?? "mock"
+            }
             perspectives={PERSPECTIVES}
             blockedVoiceIds={[...resolved.blockedVoiceIds]}
           />

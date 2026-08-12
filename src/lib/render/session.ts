@@ -61,7 +61,11 @@ export async function renderSession(experience: Experience): Promise<RenderResul
     };
   }
 
-  const ttsProvider = getTtsProvider(envValue("TTS_PROVIDER") as TtsProviderId | undefined);
+  // The session's own setting wins; the environment is only the default for
+  // sessions created before anybody chose.
+  const ttsProvider = getTtsProvider(
+    (experience.settings.ttsProvider ?? envValue("TTS_PROVIDER")) as TtsProviderId | undefined,
+  );
 
   const generatedDir = await ensureBucket("generated");
   const processedDir = await ensureBucket("processed");

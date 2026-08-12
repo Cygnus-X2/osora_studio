@@ -35,6 +35,8 @@ interface RightPanelProps {
   soundStyles: string[];
   llmProviders: Array<{ id: string; label: string; configured: boolean }>;
   ttsProviders: Array<{ id: string; label: string; configured: boolean }>;
+  /** What will render this session — not merely what is installed. */
+  activeTtsProvider: string;
   perspectives: Array<{ key: string; label: string }>;
   /** Voice ids removed by a hard user boundary — shown, but not selectable. */
   blockedVoiceIds: string[];
@@ -60,6 +62,7 @@ export function ComposerRightPanel({
   soundStyles,
   llmProviders,
   ttsProviders,
+  activeTtsProvider,
   perspectives,
   blockedVoiceIds,
 }: RightPanelProps) {
@@ -69,6 +72,7 @@ export function ComposerRightPanel({
   const [soundIntensity, setSoundIntensity] = useState(settings.soundIntensity);
   const [voiceId, setVoiceId] = useState(settings.voiceId);
   const [provider, setProvider] = useState(settings.llmProvider);
+  const [ttsProvider, setTtsProvider] = useState(activeTtsProvider);
 
   // The prototype does not persist; running an action shows the state machine
   // the real handler drives, without pretending work happened.
@@ -227,7 +231,7 @@ export function ComposerRightPanel({
         <TabsContent value="audio" className="mt-0 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="tts-provider">Voice provider</Label>
-            <Select defaultValue="mock">
+            <Select value={ttsProvider} onValueChange={setTtsProvider}>
               <SelectTrigger id="tts-provider">
                 <SelectValue />
               </SelectTrigger>

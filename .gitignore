@@ -47,3 +47,4 @@ next-env.d.ts
 
 # local scratch
 /deploy/*.local
+.audio-local/
