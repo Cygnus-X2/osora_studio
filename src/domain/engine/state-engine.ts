@@ -856,9 +856,27 @@ function pickVoice(
   if (available.includes(preferred)) {
     return { voiceId: preferred, reason: "Stable Osora voice identity, not blocked for this user." };
   }
+
+  // Otherwise choose on the one measurable criterion that matters: how close
+  // the voice reads to the planning rate. Taking the first of the list is
+  // arbitrary, and an arbitrary voice makes every word budget wrong.
+  const rated = available
+    .map((id) => ({ id, wpm: input.production.voicePaces?.[id] }))
+    .filter((entry): entry is { id: string; wpm: number } => typeof entry.wpm === "number");
+
+  if (rated.length > 0) {
+    const target = input.production.wordsPerMinute;
+    rated.sort((a, b) => Math.abs(a.wpm - target) - Math.abs(b.wpm - target));
+    return {
+      voiceId: rated[0].id,
+      reason: `Closest measured pace to the ${target} wpm planning rate (${rated[0].wpm} wpm).`,
+    };
+  }
+
   return {
     voiceId: available[0],
-    reason: "The stable voice identity is blocked by a user boundary; nearest approved voice used.",
+    reason:
+      "No approved voice has a measured pace yet, so the first available was used. Generate samples in the voice library to choose on evidence.",
   };
 }
 

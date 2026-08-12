@@ -7,10 +7,11 @@ import { countWords, recomputeBounds } from "@/domain/timeline/planner";
 import { buildHardConstraints, getLlmProvider, type LlmProviderId } from "@/providers/llm";
 import { OSORA_DNA } from "@/data/seed/dna";
 import { findExperience } from "@/data/source";
-import { createExperience, saveTimeline, updateStatus } from "@/lib/db/experiences";
+import { createExperience, saveSettings, saveTimeline, updateStatus } from "@/lib/db/experiences";
 import { isDatabaseConfigured } from "@/lib/db/client";
 import type {
   BoundaryKey,
+  Experience,
   DesiredDirection,
   DimensionKey,
   FamiliarityGroup,
@@ -194,6 +195,28 @@ export async function generateScriptAction(idOrSlug: string): Promise<ActionResu
     };
   }
 
+  revalidatePath(`/composer/${idOrSlug}`);
+  return { ok: true };
+}
+
+/**
+ * Persists a settings change from the composer.
+ *
+ * Small and immediate on purpose: a control that appears to change something
+ * and only holds it in client state is worse than no control at all.
+ */
+export async function saveSettingsAction(
+  idOrSlug: string,
+  patch: Record<string, string | number>,
+): Promise<ActionResult> {
+  if (!isDatabaseConfigured()) {
+    return { ok: false, error: "No database configured, so settings cannot be saved." };
+  }
+  try {
+    await saveSettings(idOrSlug, patch as Partial<Experience["settings"]>);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not save." };
+  }
   revalidatePath(`/composer/${idOrSlug}`);
   return { ok: true };
 }

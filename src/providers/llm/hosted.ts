@@ -296,7 +296,8 @@ export class HostedLlmProvider implements LlmProvider {
 
   async generateScript(request: CompositionRequest): Promise<LlmResponse<ScriptResult>> {
     const fallback: ScriptResult = { sections: [] };
-    const { data, raw, model } = await this.completeJson(request, buildUserPrompt(request), fallback);
+    const user = buildUserPrompt(request);
+    const { data, raw, model } = await this.completeJson(request, user, fallback);
 
     // Enforce the plan on the way back: unknown sections are dropped, and word
     // counts are recomputed from the text rather than trusted from the model.
@@ -305,7 +306,18 @@ export class HostedLlmProvider implements LlmProvider {
       .filter((s) => allowed.has(s.sectionId))
       .map((s) => ({ ...s, wordCount: countWords(s.text) }));
 
-    return this.wrap({ sections }, model, raw);
+    const wrapped = this.wrap({ sections }, model, raw);
+    return {
+      ...wrapped,
+      transcript: {
+        provider: this.id,
+        model,
+        temperature: request.temperature,
+        system: buildSystemPrompt(),
+        user,
+        raw: raw.text,
+      },
+    };
   }
 
   async composeSession(request: CompositionRequest): Promise<LlmResponse<ScriptResult>> {

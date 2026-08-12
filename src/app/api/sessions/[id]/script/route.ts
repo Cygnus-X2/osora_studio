@@ -43,6 +43,13 @@ export async function POST(
       promptVersion: experience.settings.promptTemplate,
     });
 
+    const allowed = new Set(experience.timeline.sections.map((s) => s.id));
+    // What the model returned that the plan does not recognise. Should be
+    // empty; if it is not, the enforcement is doing visible work.
+    const discarded = response.data.sections
+      .filter((s) => !allowed.has(s.sectionId))
+      .map((s) => s.sectionId);
+
     const byId = new Map(response.data.sections.map((s) => [s.sectionId, s.text]));
     const sections = experience.timeline.sections.map((section) => {
       const text = byId.get(section.id);
@@ -75,6 +82,8 @@ export async function POST(
       // hoping the model respected them.
       overrunCount: overruns.length,
       totalWords: sections.reduce((sum, s) => sum + s.wordCount, 0),
+      discardedSectionIds: discarded,
+      transcript: response.transcript ?? null,
     });
   } catch (error) {
     return NextResponse.json(

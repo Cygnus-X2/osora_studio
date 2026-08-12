@@ -28,6 +28,16 @@ import type { AudioAnalysis, Experience } from "@/domain/types";
  * Nothing here trusts a requested duration at any stage.
  */
 
+/**
+ * How far below the narration the bed sits. The flow validator treats 12 dB as
+ * the minimum; a little more keeps it present without competing.
+ */
+const BED_GAP_DB = 14;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export interface RenderProgressStep {
   step: string;
   detail: string;
@@ -73,7 +83,12 @@ export async function renderSession(experience: Experience): Promise<RenderResul
 
   let costEstimateUsd = 0;
   const measured: Record<string, number> = {};
-  const clipFiles: Array<{ sectionId: string; filePath: string; seconds: number }> = [];
+  const clipFiles: Array<{
+    sectionId: string;
+    filePath: string;
+    seconds: number;
+    loudnessLufs: number | null;
+  }> = [];
 
   // 1–2. Narrate and measure, section by section.
   const models = await ttsProvider.listModels();
@@ -106,9 +121,14 @@ export async function renderSession(experience: Experience): Promise<RenderResul
       );
       await writeFile(filePath, generated.bytes);
 
-      const analysis = await analyseAudioFile(filePath);
+      const analysis = await analyseAudioFile(filePath, { measureLevels: true });
       measured[section.id] = analysis.durationSeconds;
-      clipFiles.push({ sectionId: section.id, filePath, seconds: analysis.durationSeconds });
+      clipFiles.push({
+        sectionId: section.id,
+        filePath,
+        seconds: analysis.durationSeconds,
+        loudnessLufs: analysis.loudnessLufs,
+      });
       costEstimateUsd += generated.costEstimateUsd;
 
       const drift = analysis.durationSeconds - section.estimatedSpeechSeconds;
@@ -174,6 +194,7 @@ export async function renderSession(experience: Experience): Promise<RenderResul
     let bedPath: string;
     let bedSeconds: number;
 
+    let bedLoudness: number | null = null;
     let generatedBed: Awaited<ReturnType<typeof ttsProvider.generateAmbientSound>> | null = null;
     if (soundModel) {
       try {
@@ -197,10 +218,12 @@ export async function renderSession(experience: Experience): Promise<RenderResul
       bedPath = path.join(generatedDir, `${runId}-bed.${generatedBed.format}`);
       await writeFile(bedPath, generatedBed.bytes);
       costEstimateUsd += generatedBed.costEstimateUsd;
-      bedSeconds = (await analyseAudioFile(bedPath)).durationSeconds;
+      const bedAnalysis = await analyseAudioFile(bedPath, { measureLevels: true });
+      bedSeconds = bedAnalysis.durationSeconds;
+      bedLoudness = bedAnalysis.loudnessLufs;
       steps.push({
         step: "Ambient bed generated",
-        detail: `requested ${Math.ceil(totalSeconds)}s · measured ${bedSeconds.toFixed(1)}s`,
+        detail: `requested ${Math.ceil(totalSeconds)}s · measured ${bedSeconds.toFixed(1)}s at ${bedLoudness ?? "?"} LUFS`,
       });
 
       // Providers cap sound generation far below session length, so the bed
@@ -225,14 +248,31 @@ export async function renderSession(experience: Experience): Promise<RenderResul
       steps.push({ step: "Silent bed rendered", detail: `${bedSeconds.toFixed(1)}s` });
     }
 
+    // Place the bed *relative to measured narration*, not by a fixed offset.
+    // Providers return wildly different levels — one bed arrived at -54 LUFS,
+    // and attenuating that by a further 16 dB made it inaudible. The rule is a
+    // gap below the voice, so compute the gain that produces that gap.
+    const narrationLoudness =
+      clipFiles.map((c) => c.loudnessLufs).find((l): l is number => typeof l === "number") ?? -19;
+    const targetBedLoudness = narrationLoudness - BED_GAP_DB;
+    const bedGainDb =
+      bedLoudness === null ? -16 : clamp(targetBedLoudness - bedLoudness, -40, 40);
+
+    steps.push({
+      step: "Bed level set",
+      detail:
+        bedLoudness === null
+          ? "bed loudness unmeasurable — fell back to a fixed -16 dB"
+          : `narration ${narrationLoudness.toFixed(1)} LUFS · bed ${bedLoudness.toFixed(1)} LUFS → ${bedGainDb >= 0 ? "+" : ""}${bedGainDb.toFixed(1)} dB for a ${BED_GAP_DB} dB gap`,
+    });
+
     sources.unshift({
       clipId: "bed",
       filePath: bedPath,
       startSeconds: 0,
       offsetSeconds: 0,
       durationSeconds: Math.min(bedSeconds, totalSeconds),
-      // Well below the voice; the 12 dB gap is a validation rule.
-      gainDb: -16,
+      gainDb: bedGainDb,
       fadeInSeconds: experience.settings.fadeInSeconds,
       fadeOutSeconds: experience.settings.fadeOutSeconds,
     });

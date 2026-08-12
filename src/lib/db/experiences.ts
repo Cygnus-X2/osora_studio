@@ -175,6 +175,11 @@ export async function createExperience(input: CreateExperienceInput): Promise<Ex
     availableVoiceIds: shortlist.length
       ? shortlist.map((v) => v.providerVoiceId)
       : PRODUCTION.availableVoiceIds,
+    voicePaces: Object.fromEntries(
+      shortlist
+        .filter((v) => v.wordsPerMinute !== null)
+        .map((v) => [v.providerVoiceId, v.wordsPerMinute as number]),
+    ),
   };
 
   const plan = runStateEngine({
@@ -306,6 +311,29 @@ export async function saveTimeline(
 
   await writeSections(existing.id, timeline);
   await recordVersion(existing.id, rows[0].version, label, summary, existing.plan, timeline);
+  return toExperience(rows[0]);
+}
+
+/**
+ * Persists composer settings.
+ *
+ * Without this the voice picker was decorative: the select held client state,
+ * the render read the row, and the two never met. A control that appears to
+ * change something and does not is worse than no control.
+ */
+export async function saveSettings(
+  idOrSlug: string,
+  patch: Partial<ComposerSettings>,
+): Promise<Experience | null> {
+  const existing = await getExperienceRow(idOrSlug);
+  if (!existing) return null;
+
+  const settings = { ...existing.settings, ...patch };
+  const rows = await query<ExperienceRow>(
+    `update experiences set settings = $2, updated_at = now()
+      where id = $1 returning *, null::text as updated_by_name`,
+    [existing.id, JSON.stringify(settings)],
+  );
   return toExperience(rows[0]);
 }
 

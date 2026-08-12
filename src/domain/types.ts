@@ -487,6 +487,8 @@ export interface ProductionConstraints {
   minSectionSeconds: number;
   wordsPerMinute: number;
   availableVoiceIds: string[];
+  /** Measured words per minute per voice, where a sample has been generated. */
+  voicePaces?: Record<string, number>;
   availableSoundStyles: string[];
 }
 

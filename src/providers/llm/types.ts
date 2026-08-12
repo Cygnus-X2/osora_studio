@@ -95,12 +95,30 @@ export interface LlmUsage {
   costEstimateUsd: number;
 }
 
+/**
+ * Exactly what crossed the wire.
+ *
+ * Worth surfacing rather than hiding: the whole claim of this architecture is
+ * that the model receives a frozen plan and cannot exceed it. That claim is
+ * only checkable if you can read the prompt.
+ */
+export interface LlmTranscript {
+  provider: string;
+  model: string;
+  temperature: number;
+  system: string;
+  user: string;
+  /** The response before any parsing or filtering. */
+  raw: string;
+}
+
 export interface LlmResponse<T> {
   data: T;
   usage: LlmUsage;
   model: string;
   /** Always true. AI output is a draft until a human accepts it. */
   isDraft: true;
+  transcript?: LlmTranscript;
 }
 
 export interface LlmProvider {

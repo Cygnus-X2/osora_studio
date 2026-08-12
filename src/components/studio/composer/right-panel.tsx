@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { saveSettingsAction } from "@/app/(studio)/composer/actions";
 import { SessionActions } from "./session-actions";
 import type { ComposerSettings } from "@/domain/types";
 
@@ -73,6 +74,17 @@ export function ComposerRightPanel({
   const [voiceId, setVoiceId] = useState(settings.voiceId);
   const [provider, setProvider] = useState(settings.llmProvider);
   const [ttsProvider, setTtsProvider] = useState(activeTtsProvider);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  // Persist immediately. The alternative — a Save button — invites exactly the
+  // mistake this replaced, where a chosen voice was never the one that spoke.
+  function persist(patch: Record<string, string | number>, label: string) {
+    setSaved(`saving ${label}…`);
+    saveSettingsAction(experienceId, patch).then((result) => {
+      setSaved(result.ok ? `${label} saved` : (result.error ?? "not saved"));
+      window.setTimeout(() => setSaved(null), 2500);
+    });
+  }
 
   // The prototype does not persist; running an action shows the state machine
   // the real handler drives, without pretending work happened.
@@ -231,7 +243,13 @@ export function ComposerRightPanel({
         <TabsContent value="audio" className="mt-0 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="tts-provider">Voice provider</Label>
-            <Select value={ttsProvider} onValueChange={setTtsProvider}>
+            <Select
+              value={ttsProvider}
+              onValueChange={(v) => {
+                setTtsProvider(v);
+                persist({ ttsProvider: v }, "provider");
+              }}
+            >
               <SelectTrigger id="tts-provider">
                 <SelectValue />
               </SelectTrigger>
@@ -248,7 +266,13 @@ export function ComposerRightPanel({
 
           <div className="space-y-1.5">
             <Label htmlFor="voice">Voice</Label>
-            <Select value={voiceId} onValueChange={setVoiceId}>
+            <Select
+              value={voiceId}
+              onValueChange={(v) => {
+                setVoiceId(v);
+                persist({ voiceId: v }, "voice");
+              }}
+            >
               <SelectTrigger id="voice">
                 <SelectValue />
               </SelectTrigger>
@@ -269,6 +293,7 @@ export function ComposerRightPanel({
             </Select>
           </div>
 
+          {saved && <p className="text-[11px] leading-4 text-clay">{saved}</p>}
           <p className="text-[11px] leading-4 text-ink-faint">
             {voicesAreShortlist
               ? "Shortlisted voices only. Approve more in the voice library."
@@ -342,7 +367,10 @@ export function ComposerRightPanel({
 
           <div className="space-y-1.5 border-t border-line pt-4">
             <Label htmlFor="sound-style">Sound style</Label>
-            <Select defaultValue={settings.soundStyle}>
+            <Select
+              defaultValue={settings.soundStyle}
+              onValueChange={(v) => persist({ soundStyle: v }, "sound style")}
+            >
               <SelectTrigger id="sound-style">
                 <SelectValue />
               </SelectTrigger>

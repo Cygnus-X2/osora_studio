@@ -5,6 +5,7 @@ import { MECHANISM_BY_KEY } from "@/domain/mechanisms/library";
 import { detectClaims } from "@/domain/safety/claims";
 import { countWords } from "@/domain/timeline/planner";
 import type { Intervention, ProfessionalSkillKey, RankedIntervention, SectionTimeline } from "@/domain/types";
+import { buildSystemPrompt, buildUserPrompt } from "./prompt";
 import type {
   ClaimValidationResult,
   CompositionRequest,
@@ -164,6 +165,9 @@ export class MockLlmProvider implements LlmProvider {
   }
 
   async generateScript(request: CompositionRequest): Promise<LlmResponse<ScriptResult>> {
+    const system = buildSystemPrompt();
+    const user = buildUserPrompt(request);
+
     const sections = request.timeline.sections.map((section) => {
       const text = composeSectionText(
         section.kind,
@@ -175,7 +179,19 @@ export class MockLlmProvider implements LlmProvider {
     });
 
     const outputTokens = sections.reduce((sum, s) => sum + s.wordCount * 2, 0);
-    return wrap({ sections }, 2400, outputTokens);
+    const response = wrap({ sections }, 2400, outputTokens);
+    return {
+      ...response,
+      transcript: {
+        provider: "mock",
+        model: "mock-composer-1",
+        temperature: request.temperature,
+        system,
+        // The prompt a hosted provider would receive, built by the same code.
+        user,
+        raw: JSON.stringify({ sections }, null, 2),
+      },
+    };
   }
 
   async composeSession(request: CompositionRequest): Promise<LlmResponse<ScriptResult>> {
