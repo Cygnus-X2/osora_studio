@@ -16,14 +16,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SessionActions } from "./session-actions";
-import type { ComposerSettings, Voice } from "@/domain/types";
+import type { ComposerSettings } from "@/domain/types";
+
+export interface VoiceOption {
+  id: string;
+  name: string;
+  approved: boolean;
+  wordsPerMinute: number | null;
+}
 
 interface RightPanelProps {
   experienceId: string;
   hasScript: boolean;
   canEdit: boolean;
   settings: ComposerSettings;
-  voices: Voice[];
+  voices: VoiceOption[];
+  voicesAreShortlist: boolean;
   soundStyles: string[];
   llmProviders: Array<{ id: string; label: string; configured: boolean }>;
   ttsProviders: Array<{ id: string; label: string; configured: boolean }>;
@@ -48,6 +56,7 @@ export function ComposerRightPanel({
   canEdit,
   settings,
   voices,
+  voicesAreShortlist,
   soundStyles,
   llmProviders,
   ttsProviders,
@@ -243,16 +252,22 @@ export function ComposerRightPanel({
                 {voices.map((voice) => {
                   const blocked = blockedVoiceIds.includes(voice.id);
                   return (
-                    <SelectItem key={voice.id} value={voice.id} disabled={blocked || !voice.approved}>
+                    <SelectItem key={voice.id} value={voice.id} disabled={blocked}>
                       {voice.name}
+                      {voice.wordsPerMinute ? ` · ${voice.wordsPerMinute} wpm` : ""}
                       {blocked && " — blocked by boundary"}
-                      {!blocked && !voice.approved && " — not approved"}
                     </SelectItem>
                   );
                 })}
               </SelectContent>
             </Select>
           </div>
+
+          <p className="text-[11px] leading-4 text-ink-faint">
+            {voicesAreShortlist
+              ? "Shortlisted voices only. Approve more in the voice library."
+              : "No voice has been approved yet, so these are the seeded defaults. Approve some in the voice library."}
+          </p>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

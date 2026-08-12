@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { flowAnalysisFor, ruleResultsFor, ruleSummaryFor, store } from "@/data/store";
 import { experienceVersions, findExperience } from "@/data/source";
+import { listStudioVoices } from "@/lib/db/voices";
 import { PROFESSIONAL_BY_ID, SKILL_LABELS } from "@/data/seed/people";
 import { resolveConstraints } from "@/domain/constraints/catalog";
 import { INTERVENTION_BY_KEY } from "@/domain/interventions/library";
@@ -207,6 +208,29 @@ export default async function ComposerDetailPage({
   const contributors = experience.contributorIds
     .map((cid) => PROFESSIONAL_BY_ID[cid])
     .filter(Boolean);
+
+  // The composer offers the shortlist. If nothing has been approved yet it
+  // falls back to the seeded voices, so a fresh install is not a dead end —
+  // and says which of the two it is showing.
+  const shortlist = await listStudioVoices(true).catch(() => []);
+  const voiceOptions = shortlist.length
+    ? shortlist.map((v) => ({
+        id: v.providerVoiceId,
+        providerVoiceId: v.providerVoiceId,
+        provider: v.provider,
+        name: v.name,
+        description: v.description ?? "",
+        gender: v.gender ?? "",
+        accent: v.accent ?? "",
+        languages: v.languages,
+        warmth: 0,
+        pace: 0,
+        suitableFor: [],
+        previewAssetId: null,
+        approved: true,
+        wordsPerMinute: v.wordsPerMinute,
+      }))
+    : store.voices().map((v) => ({ ...v, wordsPerMinute: null }));
 
   const drift = timeline ? analyseDrift(timeline) : null;
   const failed = rules.filter((r) => !r.passed);
@@ -695,7 +719,8 @@ export default async function ComposerDetailPage({
             hasScript={(timeline?.sections ?? []).some((s) => s.text.trim().length > 0)}
             canEdit={!["published", "archived", "approved"].includes(experience.status)}
             settings={experience.settings}
-            voices={store.voices()}
+            voices={voiceOptions}
+            voicesAreShortlist={shortlist.length > 0}
             soundStyles={["low_bed", "warm_drone", "soft_air", "near_silence", "slow_pulse"]}
             llmProviders={[
               { id: "mock", label: "Mock provider", configured: true },

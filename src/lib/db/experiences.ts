@@ -19,6 +19,7 @@ import type {
 import { OSORA_DNA } from "@/data/seed/dna";
 import { VOICES } from "@/data/seed/audio-library";
 import { isDatabaseConfigured, query } from "./client";
+import { listStudioVoices } from "./voices";
 
 /**
  * The experience repository.
@@ -163,6 +164,17 @@ function defaultSettings(overrides: Partial<ComposerSettings> = {}): ComposerSet
  * recorded — which is what makes the trace worth keeping.
  */
 export async function createExperience(input: CreateExperienceInput): Promise<Experience> {
+  // The engine may only recommend a voice the studio has approved. Falling
+  // back to the seeded list keeps a fresh install working rather than
+  // producing a plan that recommends a voice nobody can use.
+  const shortlist = await listStudioVoices(true).catch(() => []);
+  const production = {
+    ...PRODUCTION,
+    availableVoiceIds: shortlist.length
+      ? shortlist.map((v) => v.providerVoiceId)
+      : PRODUCTION.availableVoiceIds,
+  };
+
   const plan = runStateEngine({
     currentState: input.currentState,
     desired: input.desired,
@@ -171,7 +183,7 @@ export async function createExperience(input: CreateExperienceInput): Promise<Ex
     familiarGroups: input.familiarGroups,
     recentInterventionKeys: [],
     outcomeBias: {},
-    production: PRODUCTION,
+    production,
   });
 
   const settings = defaultSettings({
@@ -184,8 +196,12 @@ export async function createExperience(input: CreateExperienceInput): Promise<Ex
     soundStyle: plan.soundRecommendation?.style ?? input.settings?.soundStyle ?? "low_bed",
   });
 
+  // Plan against the measured pace of the chosen voice where one exists. A
+  // voice that reads at 190 wpm against a 105 wpm assumption produces word
+  // budgets that are wrong before anybody writes a word.
+  const chosen = shortlist.find((v) => v.providerVoiceId === settings.voiceId);
   const timeline = planTimeline(plan, OSORA_DNA, {
-    wordsPerMinute: PRODUCTION.wordsPerMinute,
+    wordsPerMinute: chosen?.wordsPerMinute ?? PRODUCTION.wordsPerMinute,
     speakingRate: settings.speakingRate,
   });
 

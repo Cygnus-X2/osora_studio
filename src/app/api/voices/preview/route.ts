@@ -6,6 +6,8 @@ import { z } from "zod";
 import { analyseAudioFile } from "@/providers/audio/ffprobe";
 import { getTtsProvider, type TtsProviderId } from "@/providers/tts";
 import { ensureBucket } from "@/lib/paths";
+import { isDatabaseConfigured } from "@/lib/db/client";
+import { recordVoiceMeasurement } from "@/lib/db/voices";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -22,6 +24,12 @@ export const maxDuration = 120;
  */
 const SAMPLE_TEXT =
   "Let your attention move to where your feet meet the floor. Nothing to change — just noticing that the contact is there. See if the out-breath can become a little longer than the in-breath.";
+
+const SAMPLE_WORDS = SAMPLE_TEXT.split(/\s+/).length;
+
+function paceOf(durationSeconds: number): number | null {
+  return durationSeconds > 0 ? Math.round((SAMPLE_WORDS / durationSeconds) * 60) : null;
+}
 
 const schema = z.object({
   voiceId: z.string().min(1),
@@ -59,6 +67,16 @@ export async function POST(request: Request) {
       try {
         await access(filePath, constants.R_OK);
         const analysis = await analyseAudioFile(filePath);
+        const wordsPerMinute = paceOf(analysis.durationSeconds);
+
+        // Re-record on read: a measurement can predate the column that stores
+        // it, and this is the cheapest place to backfill.
+        if (isDatabaseConfigured()) {
+          await recordVoiceMeasurement(provider.id, voiceId, wordsPerMinute, fileName).catch(
+            () => undefined,
+          );
+        }
+
         return NextResponse.json({
           ok: true,
           cached: true,
@@ -67,6 +85,7 @@ export async function POST(request: Request) {
           playbackUrl: `/api/audio/file/${encodeURIComponent(fileName)}`,
           analysis,
           sampleText: SAMPLE_TEXT,
+          wordsPerMinute,
           costEstimateUsd: 0,
         });
       } catch {
@@ -87,6 +106,16 @@ export async function POST(request: Request) {
     await writeFile(filePath, generated.bytes);
     const analysis = await analyseAudioFile(filePath, { measureLevels: true });
 
+    const wordsPerMinute = paceOf(analysis.durationSeconds);
+
+    // Keep the measurement with the voice, so the shortlist can be sorted by
+    // how close each one lands to the planning rate.
+    if (isDatabaseConfigured()) {
+      await recordVoiceMeasurement(provider.id, voiceId, wordsPerMinute, fileName).catch(
+        () => undefined,
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       cached: false,
@@ -96,13 +125,8 @@ export async function POST(request: Request) {
       playbackUrl: `/api/audio/file/${encodeURIComponent(fileName)}`,
       analysis,
       sampleText: SAMPLE_TEXT,
-      // Words per minute is the number that decides whether a voice can carry
-      // an Osora session: the planner assumes 105, and a voice far from that
-      // makes every duration estimate wrong before a session is even written.
-      wordsPerMinute:
-        analysis.durationSeconds > 0
-          ? Math.round((SAMPLE_TEXT.split(/\s+/).length / analysis.durationSeconds) * 60)
-          : null,
+      // The number that decides whether a voice can carry an Osora session.
+      wordsPerMinute,
       costEstimateUsd: generated.costEstimateUsd,
     });
   } catch (error) {

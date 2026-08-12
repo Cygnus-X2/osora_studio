@@ -10,7 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { store } from "@/data/store";
+import { listStudioVoices } from "@/lib/db/voices";
+import { isDatabaseConfigured } from "@/lib/db/client";
 import { DEFAULT_WORDS_PER_MINUTE } from "@/domain/timeline/planner";
 import { getTtsProvider, ttsProviderAvailability, type TtsProviderId } from "@/providers/tts";
 import { envValue } from "@/lib/env";
@@ -44,22 +45,31 @@ export default async function VoicesPage() {
     ]);
     models = providerModels;
 
-    // The studio's own approved voices are matched by name so the reference
-    // voice stays recognisable in a list of a hundred provider voices.
-    const approved = store.voices();
-    const referenceName = approved.find((v) => v.id === "voice-aurel")?.name.toLowerCase();
+    // The shortlist and any previous measurement come from the database, so
+    // approving a voice survives a reload and a redeploy.
+    const stored = await listStudioVoices().catch(() => []);
+    const byProviderId = new Map(stored.map((v) => [v.providerVoiceId, v]));
+    const reference = stored.find((v) => v.approved && v.notes === "reference");
 
-    voices = providerVoices.map((v) => ({
-      id: v.id,
-      name: v.name,
-      description: v.description,
-      gender: v.gender,
-      accent: v.accent,
-      languages: v.languages,
-      providerPreviewUrl: v.previewUrl,
-      approved: approved.some((a) => a.approved && a.name.toLowerCase() === v.name.toLowerCase()),
-      isReference: !!referenceName && v.name.toLowerCase() === referenceName,
-    }));
+    voices = providerVoices.map((v) => {
+      const record = byProviderId.get(v.id);
+      return {
+        id: v.id,
+        name: v.name,
+        description: v.description,
+        gender: v.gender,
+        accent: v.accent,
+        languages: v.languages,
+        providerPreviewUrl: v.previewUrl,
+        approved: record?.approved ?? false,
+        isReference: reference?.providerVoiceId === v.id,
+        wordsPerMinute: record?.wordsPerMinute ?? null,
+      };
+    });
+
+    // Shortlisted first — a list of sixty is unusable if the six you chose are
+    // scattered through it.
+    voices.sort((a, b) => Number(b.approved) - Number(a.approved) || a.name.localeCompare(b.name));
   } catch (cause) {
     error = cause instanceof Error ? cause.message : "Could not reach the voice provider.";
   }
@@ -88,6 +98,7 @@ export default async function VoicesPage() {
           provider={providerId}
           configured={configured}
           plannerWpm={DEFAULT_WORDS_PER_MINUTE}
+          databaseReady={isDatabaseConfigured()}
         />
       )}
 

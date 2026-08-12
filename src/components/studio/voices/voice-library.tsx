@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Loader2, Play, Sparkles } from "lucide-react";
+import { AlertTriangle, Loader2, Play, Sparkles, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,9 +17,11 @@ export interface LibraryVoice {
   languages: string[];
   /** The provider's own hosted sample, if it publishes one. */
   providerPreviewUrl: string | null;
-  /** Set when this voice is already the Osora reference or is approved. */
+  /** On the studio shortlist — the composer offers approved voices only. */
   approved: boolean;
   isReference: boolean;
+  /** Measured from a previous Osora sample, if one has been generated. */
+  wordsPerMinute: number | null;
 }
 
 interface PreviewState {
@@ -46,14 +48,51 @@ export function VoiceLibrary({
   provider,
   configured,
   plannerWpm,
+  databaseReady,
 }: {
   voices: LibraryVoice[];
   provider: string;
   configured: boolean;
   plannerWpm: number;
+  databaseReady: boolean;
 }) {
   const [previews, setPreviews] = useState<Record<string, PreviewState>>({});
   const [filter, setFilter] = useState("");
+  const [onlyApproved, setOnlyApproved] = useState(false);
+  const [approved, setApproved] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(voices.map((v) => [v.id, v.approved])),
+  );
+  const [saving, setSaving] = useState<string | null>(null);
+
+  async function toggleApproval(voice: LibraryVoice) {
+    const next = !approved[voice.id];
+    // Optimistic: a shortlist toggle that lags feels broken, and the failure
+    // path below puts it back if the write does not land.
+    setApproved((a) => ({ ...a, [voice.id]: next }));
+    setSaving(voice.id);
+    try {
+      const response = await fetch("/api/voices/approve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          providerVoiceId: voice.id,
+          name: voice.name,
+          description: voice.description,
+          gender: voice.gender,
+          accent: voice.accent,
+          languages: voice.languages,
+          approved: next,
+        }),
+      });
+      const data = await response.json();
+      if (!data.ok) setApproved((a) => ({ ...a, [voice.id]: !next }));
+    } catch {
+      setApproved((a) => ({ ...a, [voice.id]: !next }));
+    } finally {
+      setSaving(null);
+    }
+  }
 
   async function preview(voiceId: string, force = false) {
     setPreviews((p) => ({ ...p, [voiceId]: { loading: true } }));
@@ -88,13 +127,15 @@ export function VoiceLibrary({
     }
   }
 
-  const visible = filter.trim()
-    ? voices.filter((v) =>
-        `${v.name} ${v.description} ${v.accent} ${v.gender}`
-          .toLowerCase()
-          .includes(filter.toLowerCase()),
-      )
-    : voices;
+  const visible = voices
+    .filter((v) => (onlyApproved ? approved[v.id] : true))
+    .filter((v) =>
+      filter.trim()
+        ? `${v.name} ${v.description} ${v.accent} ${v.gender}`
+            .toLowerCase()
+            .includes(filter.toLowerCase())
+        : true,
+    );
 
   return (
     <div className="space-y-4">
@@ -106,6 +147,14 @@ export function VoiceLibrary({
           className="max-w-xs"
           aria-label="Filter voices"
         />
+        <Button
+          variant={onlyApproved ? "clay" : "outline"}
+          size="sm"
+          onClick={() => setOnlyApproved((v) => !v)}
+        >
+          <Star className={onlyApproved ? "fill-current" : ""} />
+          Shortlist ({Object.values(approved).filter(Boolean).length})
+        </Button>
         <Badge tone={configured ? "sage" : "amber"}>
           {configured ? `${provider} · live` : `${provider} · no key set`}
         </Badge>
@@ -126,9 +175,35 @@ export function VoiceLibrary({
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="truncate">{voice.name}</CardTitle>
-                  <div className="flex shrink-0 gap-1.5">
-                    {voice.isReference && <Badge tone="clay">Osora reference</Badge>}
-                    {voice.approved && !voice.isReference && <Badge tone="sage">Approved</Badge>}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {voice.isReference && <Badge tone="clay">Reference</Badge>}
+                    <button
+                      type="button"
+                      onClick={() => toggleApproval(voice)}
+                      disabled={!databaseReady || saving === voice.id}
+                      aria-pressed={approved[voice.id]}
+                      aria-label={
+                        approved[voice.id]
+                          ? `Remove ${voice.name} from the shortlist`
+                          : `Add ${voice.name} to the shortlist`
+                      }
+                      title={
+                        databaseReady
+                          ? "Approved voices are the ones the composer offers"
+                          : "No database configured"
+                      }
+                      className={`flex size-7 items-center justify-center rounded-md transition-colors ${
+                        approved[voice.id]
+                          ? "bg-sand-soft text-[#8a6f42]"
+                          : "text-ink-faint hover:bg-surface-muted hover:text-ink-muted"
+                      } disabled:opacity-40`}
+                    >
+                      {saving === voice.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Star className={`size-3.5 ${approved[voice.id] ? "fill-current" : ""}`} />
+                      )}
+                    </button>
                   </div>
                 </div>
                 {voice.description && (
@@ -242,9 +317,21 @@ export function VoiceLibrary({
                   )}
                 </div>
 
-                <p className="truncate border-t border-line pt-2 font-mono text-[10px] text-ink-faint">
-                  {voice.id}
-                </p>
+                <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
+                  <p className="truncate font-mono text-[10px] text-ink-faint">{voice.id}</p>
+                  {voice.wordsPerMinute !== null && !state?.playbackUrl && (
+                    <span
+                      className={`shrink-0 font-mono text-[10px] ${
+                        Math.abs(voice.wordsPerMinute - plannerWpm) > 25
+                          ? "text-amber"
+                          : "text-ink-muted"
+                      }`}
+                      title="Measured previously"
+                    >
+                      {voice.wordsPerMinute} wpm
+                    </span>
+                  )}
+                </div>
               </CardContent>
             </Card>
           );
